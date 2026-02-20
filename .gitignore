@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.libs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+v3_env/
+env/
+
+# Environment Variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Data & Logs
+*.log
+tests/latest_report.txt
+app/db/*.db
+app/db/*.sqlite
+
+# Project Specific
+act_pipeline/data/
+sar_pipeline/data/
