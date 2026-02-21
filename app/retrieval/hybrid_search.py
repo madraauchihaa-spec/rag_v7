@@ -35,66 +35,66 @@ def hybrid_search(
     table_name: str,
     query_text: str,
     top_k: int = 5,
-    vector_weight: float = 0.6,
-    text_weight: float = 0.4,
+    vector_weight: float = 0.75,
+    text_weight: float = 0.25,
     metadata_filter: dict = None,
     compliance_topic: str = None,
-    diversity_lambda: float = None # If set, triggers MMR
+    diversity_lambda: float = None 
 ):
     """
-    Performs hybrid search (vector + full-text) with topical prioritization and optional MMR.
+    Performs hybrid search with controlled soft fallback and a 0.55 confidence threshold.
     """
 
     if table_name not in ALLOWED_TABLES:
         raise ValueError("Invalid table name")
 
+    MIN_SCORE_THRESHOLD = 0.45
+    fetch_count = top_k * 2
     query_embedding = get_embedding(query_text)
 
+    # 1. Prepare Initial Filtered Conditions (Metadata + Topic)
     filter_conditions = []
     filter_values = []
-
     if metadata_filter:
         for key, value in metadata_filter.items():
             if value:
                 filter_conditions.append(f"{key} = %s")
                 filter_values.append(value)
-
-    where_clause = ""
-    if filter_conditions:
-        where_clause = "WHERE " + " AND ".join(filter_conditions)
-
-    # If MMR is requested, fetch more candidates to allow for diversity selection
-    fetch_count = top_k * 4 if diversity_lambda is not None else top_k * 2
-
-    # Score calculation with TOPIC BOOST
-    # We give a 0.5 bonus if the compliance_topic matches
-    topic_boost_sql = "(CASE WHEN compliance_topic = %s THEN 0.5 ELSE 0 END)" if compliance_topic else "0"
     
-    sql = f"""
-    SELECT *,
-        ({vector_weight} * (1 - (embedding <=> %s::vector)) +
-         {text_weight} * ts_rank(COALESCE(tsv, ''), plainto_tsquery(%s)) +
-         {topic_boost_sql}) AS score
-    FROM {table_name}
-    {where_clause}
-    ORDER BY score DESC
-    LIMIT %s;
-    """
-
-    params = [query_embedding, query_text]
     if compliance_topic:
-        params.append(compliance_topic)
-    params += filter_values + [fetch_count]
+        filter_conditions.append("compliance_topic = %s")
+        filter_values.append(compliance_topic)
+
+    where_clause = "WHERE " + " AND ".join(filter_conditions) if filter_conditions else ""
+    topic_boost_sql = "(CASE WHEN compliance_topic = %s THEN 0.15 ELSE 0 END)" if compliance_topic else "0"
 
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            # 1. Try with filters + topic boost
-            cursor.execute(sql, params)
+            # --- STAGE 1: FILTERED SEARCH ---
+            strict_sql = f"""
+            SELECT *,
+                ({vector_weight} * (1 - (embedding <=> %s::vector)) +
+                 {text_weight} * ts_rank(COALESCE(tsv, ''), plainto_tsquery(%s))) AS score
+            FROM {table_name}
+            {where_clause}
+            ORDER BY score DESC
+            LIMIT %s;
+            """
+            
+            strict_params = [query_embedding, query_text] + filter_values + [fetch_count]
+            cursor.execute(strict_sql, strict_params)
             results = cursor.fetchall()
             
-            # 2. Fallback: If no results and we had filters, try without metadata filters but keep topic boost
-            if not results and filter_conditions:
-                print(f"No results for {table_name} with filters {metadata_filter}. Retrying without metadata filters...")
+            if results:
+                top_score = results[0]['score']
+            else:
+                top_score = 0
+
+            # --- STAGE 2: SOFT FALLBACK ONLY IF WEAK OR NO RESULTS ---
+            # Triggered if initial results are missing or below threshold, provided filters were used
+            if (not results or top_score < MIN_SCORE_THRESHOLD) and filter_conditions:
+                print(f"Weak or no results for {table_name}. Triggering soft fallback...")
+
                 fallback_sql = f"""
                 SELECT *,
                     ({vector_weight} * (1 - (embedding <=> %s::vector)) +
@@ -104,26 +104,50 @@ def hybrid_search(
                 ORDER BY score DESC
                 LIMIT %s;
                 """
+
                 fallback_params = [query_embedding, query_text]
                 if compliance_topic:
                     fallback_params.append(compliance_topic)
                 fallback_params.append(fetch_count)
-                
+
                 cursor.execute(fallback_sql, fallback_params)
                 results = cursor.fetchall()
 
     if not results:
         return []
 
-    # Apply MMR if diversity_lambda is provided
-    if diversity_lambda is not None and len(results) > top_k:
-        def parse_embedding(emb):
-            if isinstance(emb, str):
-                return np.fromstring(emb.strip('[]'), sep=',')
-            return np.array(emb)
-            
-        doc_embeddings = [parse_embedding(r['embedding']) for r in results]
-        results = mmr(query_embedding, doc_embeddings, results, top_k=top_k, lambda_param=diversity_lambda)
+    # 1.5 Keyword Reinforcement Layer (Safe Boost)
+    def apply_keyword_boost(results, query_text):
+        query = query_text.lower()
+        KEYWORD_SECTION_MAP = {
+            "fire": ["38"],
+            "smoke": ["38"],
+            "exit": ["38"],
+            "machine": ["21"],
+            "press": ["21"],
+            "rotating": ["21"],
+            "pressure": ["31"],
+            "compressor": ["31"],
+            "air receiver": ["31"],
+            "welding": ["35"],
+            "goggles": ["35"],
+            "ppe": ["35"]
+        }
+        BOOST_VALUE = 0.12
+        for keyword, sections in KEYWORD_SECTION_MAP.items():
+            if keyword in query:
+                for r in results:
+                    if str(r.get("section_number")) in sections:
+                        r["score"] += BOOST_VALUE
+        # Re-sort after boosting
+        results = sorted(results, key=lambda x: x["score"], reverse=True)
+        return results
+
+    results = apply_keyword_boost(results, query_text)
+
+    # 2. FINAL CONFIDENCE GATE (0.45)
+    if results[0]['score'] < MIN_SCORE_THRESHOLD:
+        return []
 
     return results[:top_k]
 

@@ -1,8 +1,12 @@
-# app/ingestion/act_ingest.py
 import os
+import sys
 import json
 import psycopg2
 from dotenv import load_dotenv
+
+# Add the 'app' directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils.embedding import get_embedding
 from utils.ontology import get_topic_for_text
 
@@ -130,6 +134,11 @@ Title: {section_title}
 if __name__ == "__main__":
     # Path provided by user: act_pipeline/data/final_structured/factory_act_structured.json
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    JSON_PATH = os.path.join(BASE_DIR, "act_pipeline", "data", "final_structured", "factory_act_structured.json")
+    # Check root data folder first
+    JSON_PATH = os.path.join(BASE_DIR, "data", "final_structured", "factory_act_structured.json")
+    
+    if not os.path.exists(JSON_PATH):
+        # Fallback to pipeline-specific folder
+        JSON_PATH = os.path.join(BASE_DIR, "act_pipeline", "data", "final_structured", "factory_act_structured.json")
 
     ingest_act(file_path=JSON_PATH)

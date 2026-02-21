@@ -25,6 +25,7 @@ wheels/
 venv/
 .venv/
 v3_env/
+v4_env/
 env/
 
 # Environment Variables

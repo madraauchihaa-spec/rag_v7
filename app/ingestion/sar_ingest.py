@@ -1,8 +1,13 @@
 # app/ingestion/sar_ingest.py
 import json
 import os
+import sys
 import psycopg2
 from dotenv import load_dotenv
+
+# Add the 'app' directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils.embedding import get_embedding
 
 load_dotenv()
@@ -89,7 +94,10 @@ def ingest_sar(file_path):
 
 if __name__ == "__main__":
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    SAR_DATA_DIR = os.path.join(BASE_DIR, "sar_pipeline", "data", "final_structured")
+    SAR_DATA_DIR = os.path.join(BASE_DIR, "data", "final_structured")
+    
+    if not os.path.exists(SAR_DATA_DIR):
+        SAR_DATA_DIR = os.path.join(BASE_DIR, "sar_pipeline", "data", "final_structured")
 
     # Clear existing SAR data
     conn = psycopg2.connect(

@@ -36,10 +36,24 @@ An AI-powered RAG system for analyzing compliance audit findings and legal queri
 
 3.  **Initialize Database**:
     ```bash
-    python app/init_db.py
+    python init_db.py
     ```
 
-4.  **Run the Server**:
+4.  **Data Ingestion**:
+    To ingest the legal documents and audit reports into the vector database:
+    ```bash
+    # Set PYTHONPATH to include the app directory
+    $env:PYTHONPATH = "app"  # For Windows PowerShell
+    # or export PYTHONPATH=app for Linux/Mac/Bash
+
+    # Ingest Factories Act
+    python app/ingestion/act_ingest.py
+
+    # Ingest Site Audit Reports (SAR)
+    python app/ingestion/sar_ingest.py
+    ```
+
+5.  **Run the Server**:
     ```bash
     uvicorn app.main:app --host 127.0.0.1 --port 8005 --reload
     ```
