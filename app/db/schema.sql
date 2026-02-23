@@ -1,1 +1,0 @@
--- app/db/schema.sql

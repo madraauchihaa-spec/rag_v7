@@ -1,14 +1,16 @@
 # app/ingestion/sar_ingest.py
-import json
 import os
 import sys
+import json
 import psycopg2
+import re
 from dotenv import load_dotenv
 
 # Add the 'app' directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.embedding import get_embedding
+from utils.ontology import get_topic_for_text
 
 load_dotenv()
 
@@ -19,107 +21,142 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 
 
-from utils.ontology import get_topic_for_text
-
-def format_search_text(record):
-    observation = record.get("observation", "")
-    recommendation = record.get("recommendation", "")
-    topic = get_topic_for_text(f"{observation} {recommendation}")
-    
-    return f"""
-Topic: {topic}
-Industry: {record.get("industry_type")}
-MAH Status: {record.get("mah_status")}
-Observation: {observation}
-Recommendation: {recommendation}
-Summary: {observation[:100]}...
-"""
-
-
-def ingest_sar(file_path):
-    conn = psycopg2.connect(
+def get_connection():
+    return psycopg2.connect(
         dbname=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
         host=DB_HOST,
         port=DB_PORT,
     )
+
+
+def format_search_text(record: dict, topic: str) -> str:
+    """
+    Create enriched searchable text for embedding + FTS.
+    """
+    observation = record.get("observation", "").strip()
+    recommendation = record.get("recommendation", "").strip()
+
+    return f"""
+Source: {record.get('report_id', 'Audit Report')}
+Topic: {topic}
+Plant Area: {record.get("plant_area", "General")}
+
+Observation:
+{observation}
+
+Recommendation:
+{recommendation}
+""".strip()
+
+
+def ingest_sar(file_path: str, reset: bool = False):
+    """
+    Ingest SAR structured JSON with pages/items/tables.
+    """
+    if not os.path.exists(file_path):
+        print(f"File not found: {file_path}")
+        return
+
+    conn = get_connection()
     conn.autocommit = True
     cursor = conn.cursor()
+
+    if reset:
+        print("Clearing existing SAR data (reset=True)...")
+        cursor.execute("TRUNCATE sar_index RESTART IDENTITY")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    for record in data:
-        observation = record.get("observation", "")
-        recommendation = record.get("recommendation", "")
+    report_id = os.path.basename(file_path).replace(".json", "").upper()
+    print(f"Processing SAR: {report_id}")
+
+    records = []
+    pages = data.get("pages", [])
+
+    for page in pages:
+        items = page.get("items", [])
+        for item in items:
+            if item.get("type") == "table":
+                rows = item.get("rows", [])
+                if not rows: continue
+
+                # Look for header row
+                # We normalize headers to find observation and recommendation columns
+                header = [str(c).lower().strip() for c in rows[0]]
+                
+                obs_idx = -1
+                rec_idx = -1
+                
+                for i, h in enumerate(header):
+                    if "observation" in h: obs_idx = i
+                    if "recommendation" in h: rec_idx = i
+
+                if obs_idx != -1 and rec_idx != -1:
+                    # Process data rows
+                    for row in rows[1:]:
+                        if len(row) <= max(obs_idx, rec_idx): continue
+                        
+                        obs = str(row[obs_idx]).strip() if row[obs_idx] else ""
+                        rec = str(row[rec_idx]).strip() if row[rec_idx] else ""
+
+                        # Skip empty rows or header clones
+                        if (len(obs) > 10 or len(rec) > 10) and not obs.lower().startswith("observation"):
+                            records.append({
+                                "report_id": report_id,
+                                "observation": obs,
+                                "recommendation": rec,
+                                "plant_area": "Audit Area"
+                            })
+
+    print(f"Extracted {len(records)} findings. Indexing...")
+
+    inserted = 0
+    for record in records:
+        observation = record["observation"]
+        recommendation = record["recommendation"]
+
+        # Determine topic
         topic = get_topic_for_text(f"{observation} {recommendation}")
-        
-        search_text = format_search_text(record)
+        search_text = format_search_text(record, topic)
         embedding = get_embedding(search_text)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO sar_index (
-                report_id,
-                industry_type,
-                mah_status,
-                plant_area,
-                compliance_type,
-                compliance_topic,
-                observation,
-                recommendation,
-                search_text,
-                embedding,
-                tsv
+                report_id, industry_type, mah_status, plant_area,
+                compliance_type, compliance_topic, observation,
+                recommendation, search_text, embedding, tsv
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, to_tsvector(%s))
-        """, (
-            record.get("report_id"),
-            record.get("industry_type"),
-            record.get("mah_status"),
-            record.get("plant_area"),
-            record.get("content_type"),
-            topic,
-            record.get("observation"),
-            record.get("recommendation"),
-            search_text,
-            embedding,
-            search_text
-        ))
+            """,
+            (
+                record["report_id"], "Chemical/Process", "General", record["plant_area"],
+                "Observation", topic, observation, recommendation,
+                search_text, embedding, search_text
+            )
+        )
+        inserted += 1
 
-    print("SAR ingestion completed.")
+    print(f"✅ SAR ingestion completed for {report_id}. Inserted: {inserted}")
     cursor.close()
     conn.close()
 
 
 if __name__ == "__main__":
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    SAR_DATA_DIR = os.path.join(BASE_DIR, "data", "final_structured")
-    
-    if not os.path.exists(SAR_DATA_DIR):
-        SAR_DATA_DIR = os.path.join(BASE_DIR, "sar_pipeline", "data", "final_structured")
+    SAR_DIR = os.path.join(BASE_DIR, "sar_data", "structured")
 
-    # Clear existing SAR data
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT,
-    )
-    conn.autocommit = True
-    cursor = conn.cursor()
-    print("Clearing existing SAR data...")
-    cursor.execute("TRUNCATE sar_index RESTART IDENTITY")
-    cursor.close()
-    conn.close()
+    if not os.path.exists(SAR_DIR):
+        raise RuntimeError(f"SAR directory not found: {SAR_DIR}")
 
-    if not os.path.exists(SAR_DATA_DIR):
-        print(f"Directory not found: {SAR_DATA_DIR}")
-    else:
-        for filename in os.listdir(SAR_DATA_DIR):
-            if filename.endswith("_structured.json"):
-                file_path = os.path.join(SAR_DATA_DIR, filename)
-                print(f"Ingesting: {filename}")
-                ingest_sar(file_path)
-        print("All SAR files processed.")
+    json_files = [f for f in os.listdir(SAR_DIR) if f.lower().endswith(".json")]
+    json_files.sort()
+
+    is_first = True
+    for fn in json_files:
+        fp = os.path.join(SAR_DIR, fn)
+        ingest_sar(file_path=fp, reset=is_first)
+        is_first = False

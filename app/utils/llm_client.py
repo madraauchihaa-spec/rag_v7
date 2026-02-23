@@ -32,9 +32,15 @@ def generate_response(prompt: str):
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         else:
-            print(f"LLM API Error: {response.text}")
-            return f"[ERROR] The AI could not generate a response because of an API issue (Status {response.status_code}). Please check your API key and credits."
+            print(f"LLM API Error: {response.status_code} - {response.text}")
+            return f"[ERROR] The AI could not generate a response because of an API issue (Status {response.status_code})."
             
     except Exception as e:
         print(f"LLM Connection Error: {e}")
-        return f"[ERROR] Connection to the AI service failed. Detailed error: {str(e)}"
+        import traceback
+        traceback.print_exc()
+        # Debug: print payload types
+        print("DEBUG: Payload types:")
+        for k, v in payload.items():
+            print(f"  {k}: {type(v)}")
+        return f"[ERROR] Connection to the AI service failed."

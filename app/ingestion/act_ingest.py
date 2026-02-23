@@ -1,6 +1,8 @@
+# app/ingestion/act_ingest.py
 import os
 import sys
 import json
+import re
 import psycopg2
 from dotenv import load_dotenv
 
@@ -18,20 +20,15 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 
-def clean_noise(text):
-    """
-    Remove TOC junk and repetitive index structures.
-    """
-    import re
-    # If text has too many 'Sec X.' or 'XX. Title' in a row, it's likely a TOC
-    if len(re.findall(r"\d{1,3}\.", text)) > 5 and len(text) < 2000:
-        return ""
-    return text
 
-def ingest_act(file_path, applicable_to="All"):
+def ingest_act(file_path: str, applicable_to: str = "All", reset: bool = False):
     """
-    Ingests Act data from a structured JSON file.
+    Ingests Act data from the new 'pages' -> 'items' JSON structure.
     """
+    if not os.path.exists(file_path):
+        print(f"Error: File not found at {file_path}")
+        return
+
     conn = psycopg2.connect(
         dbname=DB_NAME,
         user=DB_USER,
@@ -42,103 +39,118 @@ def ingest_act(file_path, applicable_to="All"):
     conn.autocommit = True
     cursor = conn.cursor()
 
-    # CRITICAL: Clear existing data to prevent duplicates
-    print("Clearing existing Act data...")
-    cursor.execute("TRUNCATE act_index RESTART IDENTITY")
-
-    if not os.path.exists(file_path):
-        print(f"Error: File not found at {file_path}")
-        return
+    if reset:
+        print("Clearing existing Act data...")
+        cursor.execute("TRUNCATE act_index RESTART IDENTITY")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    metadata = data.get("metadata", {})
-    act_name = metadata.get("act_name", "Factories Act")
-    
-    import re
-    year_match = re.search(r"\d{4}", act_name)
+    act_name = os.path.basename(file_path).replace(".json", "").title()
+    year_match = re.search(r"\b(18|19|20)\d{2}\b", act_name)
     year = int(year_match.group()) if year_match else 1948
 
-    documents = data.get("documents", [])
-    print(f"Found {len(documents)} document units in {file_path}")
+    print(f"Processing: {act_name}")
 
-    ingested_count = 0
-    for doc in documents:
-        section_number = doc.get("section_number", "N/A")
-        section_title = doc.get("section_title", "Untitled")
-        chapter_title = doc.get("chapter_title", "")
-        chapter_number = doc.get("chapter_number", "")
-        
-        content = clean_noise(doc.get("content", ""))
-        subsections_text = ""
-        for sub in doc.get("subsections", []):
-            subsections_text += f"\n({sub.get('number', '')}) {sub.get('text', '')}"
-        
-        full_content = (content + subsections_text).strip()
-        
-        # Skip empty sections (likely suppressed TOC noise)
-        if not full_content or len(full_content) < 10:
-            if "Short title" not in section_title:
+    current_chapter = "General"
+    sections = []
+    current_section = None
+
+    # Matches "29. Title" or "**29. Title**"
+    section_pattern = re.compile(r"^\*?\*?(\d+[A-Z]?)\.\s*(.*?)(?:\*?\*?|$)", re.IGNORECASE)
+    chapter_pattern = re.compile(r"^CHAPTER\s+([IVXLCDM\d]+)", re.IGNORECASE)
+
+    pages = data.get("pages", [])
+    for page in pages:
+        items = page.get("items", [])
+        for item in items:
+            text = item.get("value", "").strip()
+            if not text:
                 continue
 
-        # Determine topic
-        topic = get_topic_for_text(f"{section_title} {full_content}")
+            # Check for Chapter transitions
+            if "CHAPTER" in text.upper()[:15]:
+                chap_match = chapter_pattern.match(text)
+                if chap_match:
+                    current_chapter = text
+                    continue
+
+            # Check for Section Start
+            sec_match = section_pattern.match(text)
+            if sec_match:
+                # Store the previous one
+                if current_section:
+                    sections.append(current_section)
+                
+                sec_no = sec_match.group(1)
+                sec_title = sec_match.group(2).split("\n")[0].strip()
+                current_section = {
+                    "number": sec_no,
+                    "title": sec_title or "Untitled",
+                    "content": text,
+                    "chapter": current_chapter
+                }
+            elif current_section:
+                # Add continuation text to current section
+                current_section["content"] += "\n" + text
+
+    # Add the final section
+    if current_section:
+        sections.append(current_section)
+
+    print(f"Extracted {len(sections)} potential sections. Syncing to DB...")
+    
+    ingested_count = 0
+    for sec in sections:
+        content = sec["content"].strip()
+        # Filter out very noise/TOC fragments
+        if len(content) < 50 and "short title" not in sec["title"].lower():
+            continue
+
+        topic = get_topic_for_text(f"{sec['title']} {content}")
         
-        search_text = f"""
-Act: {act_name}
-Chapter: {chapter_number} - {chapter_title}
+        search_markdown = f"""Structure: {act_name}
+Chapter: {sec['chapter']}
 Topic: {topic}
-Section: {section_number}
-Title: {section_title}
+Section: {sec['number']}
+Title: {sec['title']}
 
-{full_content}
-"""
+{content}
+""".strip()
 
-        embedding = get_embedding(search_text)
+        embedding = get_embedding(search_markdown)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO act_index (
-                act_name,
-                year,
-                chapter,
-                section_number,
-                section_title,
-                content,
-                applicable_to,
-                industry_applicability,
-                compliance_topic,
-                embedding,
-                tsv
+                act_name, year, chapter, section_number, section_title,
+                content, applicable_to, industry_applicability, compliance_topic,
+                embedding, tsv
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, to_tsvector(%s))
-        """, (
-            act_name,
-            year,
-            f"{chapter_number}: {chapter_title}" if chapter_number else None,
-            section_number,
-            section_title,
-            full_content,
-            applicable_to,
-            "All",
-            topic,
-            embedding,
-            search_text
-        ))
+            """,
+            (
+                act_name, year, sec["chapter"], sec["number"], sec["title"],
+                content, applicable_to, "All", topic, embedding, search_markdown
+            )
+        )
         ingested_count += 1
 
-    print(f"Act ingestion completed. Total unique sections: {ingested_count}")
+    print(f"✅ Ingested {ingested_count} sections for {act_name}.")
     cursor.close()
     conn.close()
 
-if __name__ == "__main__":
-    # Path provided by user: act_pipeline/data/final_structured/factory_act_structured.json
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    # Check root data folder first
-    JSON_PATH = os.path.join(BASE_DIR, "data", "final_structured", "factory_act_structured.json")
-    
-    if not os.path.exists(JSON_PATH):
-        # Fallback to pipeline-specific folder
-        JSON_PATH = os.path.join(BASE_DIR, "act_pipeline", "data", "final_structured", "factory_act_structured.json")
 
-    ingest_act(file_path=JSON_PATH)
+if __name__ == "__main__":
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    ACT_DIR = os.path.join(BASE_DIR, "act_data", "structured")
+    
+    if os.path.exists(ACT_DIR):
+        files = [f for f in os.listdir(ACT_DIR) if f.endswith(".json")]
+        files.sort()
+        is_first = True
+        for f in files:
+            ingest_act(os.path.join(ACT_DIR, f), reset=is_first)
+            is_first = False
+    else:
+        print(f"Directory not found: {ACT_DIR}")

@@ -3,118 +3,118 @@ import json
 import time
 import os
 
-# API Configuration - Using port 8005 to avoid socket conflicts
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8005/query")
+# API Configuration
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/query")
 
 # ---------------------------------------------------------
-# Test Suite: 15 Real-World Compliance Scenarios
+# Test Suite:  Real-World Compliance Scenarios
 # ---------------------------------------------------------
 TEST_SCENARIOS = [
-    # {
-    #     "id": "TC-001",
-    #     "text": "Are effective arrangements provided for disposal of wastes and effluents?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-002",
-    #     "text": "Are adequate ventilation and temperature control systems maintained?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-003",
-    #     "text": "Are dust and fume extraction systems provided and functional?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-004",
-    #     "text": "Are drinking water points marked and located away from contamination sources?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-005",
-    #     "text": "Are dangerous parts of machinery securely fenced?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-006",
-    #     "text": "Are emergency stop mechanisms and interlocks provided and functional on hazardous machines?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-007",
-    #     "text": "Is Lockout/Tagout implemented during maintenance and cleaning of machinery?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-008",
-    #     "text": "Are lifting machines, chains, ropes and lifting tackles tested and certified periodically by a competent person?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-009",
-    #     "text": "Are pressure vessels, boilers and air receivers inspected and certified as per statutory requirements?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-010",
-    #     "text": "Are adequate fire-fighting equipment and emergency exits provided and maintained?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-011",
-    #     "text": "Is a Safety Officer appointed where required under Section 40B?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-012",
-    #     "text": "Is a written Safety Policy prepared and communicated to all workers?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-013",
-    #     "text": "Has Site Appraisal Committee approval been obtained for hazardous processes?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-014",
-    #     "text": "Are Material Safety Data Sheets (MSDS) available and accessible for hazardous chemicals?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-015",
-    #     "text": "Are emergency preparedness and on-site emergency plans documented and periodically tested?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-016",
-    #     "text": "Are washing facilities, rest rooms and canteen facilities provided as per number of workers employed?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-017",
-    #     "text": "Is a crèche facility provided where more than 30 women workers are employed?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-018",
-    #     "text": "Is first aid provided with trained first aiders available in each shift (minimum 1 per 150 workers)?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-019",
-    #     "text": "Are working hours, overtime and weekly holidays regulated as per Sections 51–66 of the Act?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-020",
-    #     "text": "Is overtime paid at double the ordinary rate of wages?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # },
-    # {
-    #     "id": "TC-021",
-    #     "text": "Are young persons employed only after obtaining a fitness certificate from a Certifying Surgeon?",
-    #     "site_profile": {"industry_type": "Null", "mah_status": "Null"}
-    # }
+    {
+        "id": "TC-001",
+        "text": "Are effective arrangements provided for disposal of wastes and effluents?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-002",
+        "text": "Are adequate ventilation and temperature control systems maintained?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-003",
+        "text": "Are dust and fume extraction systems provided and functional?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-004",
+        "text": "Are drinking water points marked and located away from contamination sources?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-005",
+        "text": "Are dangerous parts of machinery securely fenced?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-006",
+        "text": "Are emergency stop mechanisms and interlocks provided and functional on hazardous machines?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-007",
+        "text": "Is Lockout/Tagout implemented during maintenance and cleaning of machinery?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-008",
+        "text": "Are lifting machines, chains, ropes and lifting tackles tested and certified periodically by a competent person?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-009",
+        "text": "Are pressure vessels, boilers and air receivers inspected and certified as per statutory requirements?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-010",
+        "text": "Are adequate fire-fighting equipment and emergency exits provided and maintained?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-011",
+        "text": "Is a Safety Officer appointed where required under Section 40B?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-012",
+        "text": "Is a written Safety Policy prepared and communicated to all workers?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-013",
+        "text": "Has Site Appraisal Committee approval been obtained for hazardous processes?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-014",
+        "text": "Are Material Safety Data Sheets (MSDS) available and accessible for hazardous chemicals?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-015",
+        "text": "Are emergency preparedness and on-site emergency plans documented and periodically tested?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-016",
+        "text": "Are washing facilities, rest rooms and canteen facilities provided as per number of workers employed?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-017",
+        "text": "Is a crèche facility provided where more than 30 women workers are employed?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-018",
+        "text": "Is first aid provided with trained first aiders available in each shift (minimum 1 per 150 workers)?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-019",
+        "text": "Are working hours, overtime and weekly holidays regulated as per Sections 51–66 of the Act?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-020",
+        "text": "Is overtime paid at double the ordinary rate of wages?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    },
+    {
+        "id": "TC-021",
+        "text": "Are young persons employed only after obtaining a fitness certificate from a Certifying Surgeon?",
+        "site_profile": {"industry_type": "Null", "mah_status": "Null"}
+    }
     # {
     #     "id": "TC-001",
     #     "text": "what are the requirements of presure plant",
@@ -239,11 +239,11 @@ def run_tests():
                 })
             else:
                 print(f"   FAILED: {response.status_code}")
-                results.append({"id": scenario["id"], "status": "FAIL", "error": response.text})
+                results.append({"id": scenario["id"], "query": scenario["text"], "status": "FAIL", "error": response.text})
                 
         except Exception as e:
             print(f"   ERROR: {e}")
-            results.append({"id": scenario["id"], "status": "ERROR", "error": str(e)})
+            results.append({"id": scenario["id"], "query": scenario["text"], "status": "ERROR", "error": str(e)})
 
     # Generate the Detailed File Content
     output_lines.append(f"\nReport Generated On: {time.ctime()}")

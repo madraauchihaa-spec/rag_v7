@@ -26,6 +26,7 @@ venv/
 .venv/
 v3_env/
 v4_env/
+v5_env/
 env/
 
 # Environment Variables
@@ -38,12 +39,14 @@ env/
 # Notebooks
 .ipynb_checkpoints/
 
-# Data & Logs
+# Logs & Temporary Files
 *.log
 tests/latest_report.txt
+server_log.txt
+
+# Database
 app/db/*.db
 app/db/*.sqlite
 
 # Project Specific
-act_pipeline/data/
-sar_pipeline/data/
+.agent/

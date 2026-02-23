@@ -1,143 +1,119 @@
+# app/rag/legal_mode.py
 import re
 from retrieval.hybrid_search import hybrid_search
 from utils.llm_client import generate_response
-from utils.intent_classifier import classify_query_intent
-from utils.reranker import llm_rerank
-from utils.governance import filter_general_sections, detect_overreach
+from utils.ontology import get_topic_for_text
+from utils.governance import filter_general_sections
 
 def build_legal_prompt(query, site_profile, act_results):
-    """
-    Builds structured legal prompt with strict grounding.
-    """
     act_text = "\n\n".join(
         [
-            f"ACT SECTION {r.get('section_number')} - {r.get('section_title')}\n"
-            f"{r.get('content')}"
+            f"ACT SECTION {r.get('section_number')} - {r.get('section_title')}\n{r.get('content')}"
             for r in act_results
         ]
     )
 
     prompt = f"""
-SYSTEM ROLE: You are a Senior Legal Compliance Specialist. Your goal is to provide a fact-based legal interpretation using ONLY the provided ACT clauses.
+SYSTEM ROLE: You are Navi.AI, a highly specialized Compliance Intelligent Assistant for Safety and Legal Professionals.
 
-CRITICAL GROUNDING RULES:
-1. NO EXTERNAL KNOWLEDGE: Answer strictly using the 'RELEVANT LEGAL PROVISIONS' provided below. 
-2. CITATION DISCIPLINE: You must ONLY reference the sections provided below. You are strictly prohibited from citing any section number or Act not present in the retrieved list. Do NOT invent thresholds, numbers, timelines, or frequencies. 
-3. STRICT GOVERNANCE:
-   - Only cite a section if it directly regulates the specific subject matter described in the user query.
-   - Do NOT use general duty sections (e.g., Section 7A) if a more specific section exists in the list.
-   - Do NOT stretch interpretation beyond what is explicitly written.
-   - Do NOT infer regulatory intent beyond the section's wording.
-   - Do NOT escalate to hazardous process sections unless the issue explicitly involves hazardous processes.
-4. SOURCE VERACITY: If none of the retrieved sections directly govern the issue, clearly state: "No directly governing section found in the retrieved Factories Act database."
-5. SITE APPLICABILITY: Evaluate how the law applies specifically to the site profile (Industry: {site_profile.get("industry_type")}).
+STEP 1: QUERY ANALYSIS
+Interpret the user's intent. If it's a greeting, respond warmly. If it's outside the scope of safety/legal/compliance, politely decline.
+If it's a valid query, bridge any partial text or synonyms to the formal legal matches provided.
 
-LEGAL QUERY:
-{query}
+STEP 2: STRUCTURED RESPONSE (ONLY use the sections below)
+You MUST follow this exact Markdown format:
 
-RELEVANT LEGAL PROVISIONS:
-{act_text if act_text else "No relevant legal clauses found in the current corpus."}
+### 🛠️ Query Analysis
+[Briefly explain how you interpreted the query and its legal relevance]
 
-Before drafting Legal Position, internally verify for each section:
-1. Does the section explicitly regulate this issue?
-2. Is the subject matter clearly mentioned in the section?
-3. Would a compliance inspector directly cite this section for this violation?
-If the answer is NO, exclude that section from your analysis.
+---
 
-STRUCTURED RESPONSE:
+### 1) Legal Applicability
+[Rephrase the retrieved law into human-readable language. Ensure 100% accuracy to the DB content. Focus on how it applies to the user's industry/state.]
 
-1. **Legal Position**
-   - Direct answer to the query based on the Act.
-   - Mention the specific section(s).
+### 2) Compliance Gap
+[Analyze if the current query implies a mismatch with the law. If no direct gap is found in data, describe the 'potential' gap based on compliance best practices.]
 
-2. **Conditions / Requirements**
-   - List the explicit conditions mentioned in the text.
-   - Highlight any 'prescribed' requirements that need State Rule verification.
+### 3) Risk Exposure
+[Detail the legal, operational, and safety risks if this clause is violated.]
 
-3. **Applicability to Site Profile**
-   - How this specific bit of law affects an industry of type '{site_profile.get("industry_type")}'.
+### 4) Recommended Action
+[Step-by-step practical advice to achieve full compliance.]
 
-4. **Compliance Steps**
-   - Actionable items to ensure one is following the law.
+### 5) Evidence Required
+[List documents, logs, or certificates required to prove compliance during an audit.]
 
-5. **Penalty (If Applicable)**
-   - ONLY mention penalties if explicitly present in the retrieved text. Otherwise, state "Penalty details for this specific provision are not provided in the current excerpt."
+---
 
-6. **Reference Sections**
-   - List the section numbers used.
+USER QUERY: {query}
+INDUSTRY: {site_profile.get('industry_type', 'General')}
+MAH STATUS: {site_profile.get('mah_status', 'N/A')}
+
+LEGAL DATA:
+{act_text}
 """
     return prompt
 
-def legal_mode(query: str, site_profile: dict):
-    """
-    Enhanced Legal Query Mode with Intent Classification
-    """
-    # 1. Classify Intent
-    topic = classify_query_intent(query)
 
-    # 2. Hybrid Search for legal provisions
+def legal_mode(query: str, site_profile: dict):
+    # Greeting / Out-of-Scope Pre-check
+    lower_q = query.lower().strip()
+    greetings = ["hi", "hello", "hey", "good morning", "good afternoon"]
+    if any(lower_q == g or lower_q.startswith(g + " ") for g in greetings):
+        return {
+            "detected_topic": "GREETING",
+            "legal_matches": [],
+            "draft_response": "Hello! I am **Navi.AI**, your Compliance Intelligent Assistant. I can help you with legal lookups, safety audit analysis, and understanding Factories Act requirements. How can I assist you today?"
+        }
+
+    topic = get_topic_for_text(query)
+
+    # Retrieval
     act_results = hybrid_search(
         table_name="act_index",
         query_text=query,
         top_k=5,
         compliance_topic=topic,
-        diversity_lambda=0.7 
+        diversity_lambda=0.70
     )
 
-    # Rerank Results
-    if act_results:
-        act_results = llm_rerank(query, act_results)
-        # Allow 2-3 sections if they are truly relevant
-        act_results = act_results[:3]
-    
-    # 2.5 Apply Legal Governance - Filter General Sections
+    act_results = (act_results or [])[:3]
     act_results = filter_general_sections(act_results)
 
-    print(f"[LEGAL MATCH COUNT]: {len(act_results)}")
-    if act_results:
-        print(f"[LEGAL SECTIONS USED]: {[m['section_number'] for m in act_results]}")
-
     if not act_results:
+        # Check if it's completely out of scope using LLM or just default
         return {
             "detected_topic": topic,
             "legal_matches": [],
-            "draft_response": """
-### ⚠️ No Direct Legal Provision Found
-The current Factories Act database does not contain a section explicitly governing this query. 
-"""
+            "draft_response": "### 🧐 Scope Validation\nI am designed specifically for **Compliance & Safety Intelligence**. I couldn't find any directly governing provisions in the Factories Act for this specific query. If this is a general question, please rephrase it with safety-related keywords."
         }
 
-    # 3. Build Prompt with Topic Context
     prompt = build_legal_prompt(query, site_profile, act_results)
-    
-    # Generate Initial Response
     response = generate_response(prompt)
 
-    # --- VERIFICATION LAYER ---
     source_context = "\n\n".join([f"SECTION {r.get('section_number')}:\n{r.get('content')}" for r in act_results])
-    
-    verification_prompt = f"""
-SYSTEM ROLE: You are a strict Legal Fact-Checker. 
-YOUR TASK: Analyze the 'DRAFT RESPONSE' for accuracy against 'SOURCE TEXT'. 
 
-SOURCE TEXT:
+    verification_prompt = f"""
+You are a Senior Compliance Auditor. Your task is to verify the DRAFT RESPONSE against the SOURCE LAW for extreme factual accuracy.
+
+SOURCE LAW:
 {source_context}
 
 DRAFT RESPONSE:
 {response}
 
 INSTRUCTIONS:
-1. Verify numbers, timelines, and requirements strictly against the Source Text.
-2. Ensure the response matches the user's specific query requirements.
-3. Rewrite only if there are factual errors or hallucinations.
-4. Remove any 'Draft' headers.
+1) Ensure 'Legal Applicability' is rephrased for a human (not just a legal copy-paste) but stays 100% true to the law.
+2) If the original response mentioned a 'Compliance Gap' that is not supported by the law, correct it.
+3) DO NOT REMOVE the headers or the 'Query Analysis' section.
+4) Remove any technical jargon that is not necessary.
+5) Ensure the tone is professional yet helpful.
 
-FINAL VERIFIED RESPONSE:
+Return the final, polished, and verified response.
 """
     verified_response = generate_response(verification_prompt)
     verified_response = re.sub(r"Draft\s*–\s*For Professional Review", "", verified_response, flags=re.IGNORECASE).strip()
 
-    # --- PREPARE RAW ACTS (No AI involvement) ---
     raw_acts_display = "\n\n".join([
         f"### Section {r.get('section_number')}: {r.get('section_title')}\n\n{r.get('content')}"
         for r in act_results
@@ -147,5 +123,5 @@ FINAL VERIFIED RESPONSE:
         "detected_topic": topic,
         "legal_matches": act_results,
         "draft_response": verified_response,
-        "Legal Applicability": raw_acts_display # Raw text directly from DB
+        "Legal Applicability": raw_acts_display
     }
