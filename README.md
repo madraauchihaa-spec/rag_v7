@@ -85,8 +85,3 @@ The system includes a specialized evaluation script for compliance accuracy:
 ```powershell
 python tests/compliance_eval.py
 ```
-
----
-
-## 📜 License
-Internal Project - All Rights Reserved.
