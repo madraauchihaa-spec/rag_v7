@@ -1,45 +1,5 @@
 # app/utils/reranker.py
 import numpy as np
-from utils.llm_client import generate_response
-
-def llm_rerank(query, sections):
-    """
-    Optional LLM reranker.
-    If LLM returns unexpected output, safely falls back to original order.
-    """
-    if not sections:
-        return []
-
-    prompt = f"""
-You are a legal ranking assistant.
-
-User Query:
-{query}
-
-Rank these sections from MOST relevant to LEAST relevant.
-Return ONLY section numbers separated by commas.
-
-Sections:
-"""
-    for s in sections:
-        prompt += f"\nSection {s.get('section_number')}: {s.get('section_title')}"
-
-    response = (generate_response(prompt) or "").strip()
-
-    ranked_numbers = [n.strip() for n in response.replace("Section", "").split(",") if n.strip()]
-    if not ranked_numbers:
-        return sections
-
-    try:
-        ranked_sections = sorted(
-            sections,
-            key=lambda x: ranked_numbers.index(str(x.get("section_number")))
-            if str(x.get("section_number")) in ranked_numbers else 999
-        )
-        return ranked_sections
-    except Exception:
-        return sections
-
 
 def cosine_similarity(v1, v2):
     v1 = np.array(v1, dtype=float)

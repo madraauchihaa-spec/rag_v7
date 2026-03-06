@@ -17,7 +17,13 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 
-ALLOWED_TABLES = {"sar_index", "act_index"}
+ALLOWED_TABLES = {"sar_index", "act_index", "standard_index"}
+
+SOURCE_WEIGHTS = {
+    "act_index": 1.0,
+    "standard_index": 0.85,
+    "sar_index": 0.6
+}
 
 
 def get_db_connection():
@@ -43,8 +49,8 @@ def hybrid_search(
     table_name: str,
     query_text: str,
     top_k: int = 5,
-    vector_weight: float = 0.75,
-    text_weight: float = 0.25,
+    vector_weight: float = 0.80,
+    text_weight: float = 0.20,
     metadata_filter: dict = None,
     compliance_topic: str = None,
     diversity_lambda: float = 0.65
@@ -59,7 +65,7 @@ def hybrid_search(
     if table_name not in ALLOWED_TABLES:
         raise ValueError("Invalid table name")
 
-    MIN_SCORE_THRESHOLD = 0.45
+    MIN_SCORE_THRESHOLD = 0.40 # Adjusted for weighted scaling
     fetch_count = top_k * 3
 
     query_embedding = get_embedding(query_text)
@@ -105,8 +111,13 @@ def hybrid_search(
                 rows = cursor.fetchall()
                 # Convert RealDictRow to plain dict for serialization safety
                 clean_rows = []
+                # Authority multiplier
+                auth_multiplier = SOURCE_WEIGHTS.get(table_name, 1.0)
+                
                 for r in rows:
                     d = dict(r)
+                    d["score"] = d["score"] * auth_multiplier
+                    
                     for k, v in d.items():
                         # Convert UUIDs and other non-JSON types to strings
                         if hasattr(v, '__class__') and v.__class__.__name__ == 'UUID':
@@ -173,19 +184,30 @@ def search_sar(query_text, industry_type=None, mah_status=None, compliance_topic
     if mah_status:
         metadata["mah_status"] = mah_status
 
-    return hybrid_search(
+    r = hybrid_search(
         table_name="sar_index",
         query_text=query_text,
-        top_k=5,
+        top_k=5, # Assuming top_k was meant to be 5 here, as it was not defined in the function signature
         metadata_filter=metadata,
         compliance_topic=compliance_topic,
         diversity_lambda=0.60
     )
+    return r
 
 
 def search_act(query_text, compliance_topic=None):
     return hybrid_search(
         table_name="act_index",
+        query_text=query_text,
+        top_k=5,
+        compliance_topic=compliance_topic,
+        diversity_lambda=0.70
+    )
+
+
+def search_standard(query_text, compliance_topic=None):
+    return hybrid_search(
+        table_name="standard_index",
         query_text=query_text,
         top_k=5,
         compliance_topic=compliance_topic,

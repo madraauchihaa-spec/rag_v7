@@ -4,6 +4,7 @@ import sys
 import json
 import re
 import psycopg2
+from tqdm import tqdm
 from dotenv import load_dotenv
 
 # Add the 'app' directory to the Python path
@@ -101,10 +102,18 @@ def ingest_act(file_path: str, applicable_to: str = "All", reset: bool = False):
     print(f"Extracted {len(sections)} potential sections. Syncing to DB...")
     
     ingested_count = 0
-    for sec in sections:
+    for sec in tqdm(sections, desc=f"Ingesting {act_name}"):
         content = sec["content"].strip()
         # Filter out very noise/TOC fragments
         if len(content) < 50 and "short title" not in sec["title"].lower():
+            continue
+
+        # DUPLICATE CHECK
+        cursor.execute(
+            "SELECT 1 FROM act_index WHERE act_name = %s AND section_number = %s",
+            (act_name, sec["number"])
+        )
+        if cursor.fetchone():
             continue
 
         topic = get_topic_for_text(f"{sec['title']} {content}")
@@ -136,7 +145,8 @@ Title: {sec['title']}
         )
         ingested_count += 1
 
-    print(f"✅ Ingested {ingested_count} sections for {act_name}.")
+    print(f"✅ Sync complete for {act_name}. New sections ingested: {ingested_count}.")
+
     cursor.close()
     conn.close()
 
@@ -148,9 +158,7 @@ if __name__ == "__main__":
     if os.path.exists(ACT_DIR):
         files = [f for f in os.listdir(ACT_DIR) if f.endswith(".json")]
         files.sort()
-        is_first = True
         for f in files:
-            ingest_act(os.path.join(ACT_DIR, f), reset=is_first)
-            is_first = False
+            ingest_act(os.path.join(ACT_DIR, f), reset=False)
     else:
         print(f"Directory not found: {ACT_DIR}")

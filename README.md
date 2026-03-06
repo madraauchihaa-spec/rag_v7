@@ -1,61 +1,117 @@
-# Compliance RAG Engine v5
+# Compliance RAG Engine v7 (Advanced)
 
-An AI-powered Compliance Intelligence System designed to analyze legal documents (Acts/Rules) and Safety Audit Reports (SAR). The system provides structured insights into legal applicability, compliance gaps, and risk exposure.
+An AI-powered Compliance Intelligence System (V7) featuring Query Decomposition, Multi-Query Hybrid Retrieval, and Context Expansion. Designed to analyze Legal Documents (Acts/Rules), Technical Standards (IS), and Safety Audit Reports (SAR).
 
-## 🚀 Features
-- **Legal Mode**: Precise retrieval and analysis of legal sections from ingested Acts.
-- **Finding Mode**: Mapping factory observations to relevant legal clauses and recommendations.
-- **Hybrid Search**: Combines Dense Vector Search (pgvector) with Full-Text Search (FTS).
-- **Automated Ingestion**: Support for complex nested JSON structures from legal and audit sources.
-- **Modern UI**: Streamlined interface for compliance exploration.
+---
+
+## 🚀 Key Features (V7 Architecture)
+- **Query Decomposition** — Breaks complex intents into targeted sub-queries for broader coverage.
+- **Multi-Query Hybrid Retrieval** — Cross-references multiple search vectors and merged rankings.
+- **Authority Ranking** — Intelligently boosts mandatory clauses and core Act sections.
+- **Context Expansion** — Automatically fetches surrounding standard clauses for comprehensive technical context.
+- **Legal Mode V7** — Advanced analysis with LLM-backed query optimization and verification.
 
 ---
 
 ## 🏗️ Project Structure
 ```text
-RAG/
-├── app/                  # FastAPI Application Core
-│   ├── ingestion/        # Ingestion logic (Act & SAR)
-│   ├── rag/              # RAG processing & prompt engineering
-│   ├── retrieval/        # Hybrid search implementation
-│   ├── utils/            # Embedding, Ontology, and Governance helpers
-│   └── main.py           # API Entry point & browser launcher
-├── frontend/             # Single Page Application
-├── act_data/             # Dataset for Legal Acts
-├── sar_data/             # Dataset for Safety Audit Reports
-├── scripts/              # Verification & Diagnostic scripts
-├── tests/                # System test suite
-├── init_db.py            # Database schema initialization
-├── requirements.txt      # Python dependencies
-└── .env.example          # Environment variable template
+RAG_v7/
+├── app/                   # FastAPI Application Core
+│   ├── ingestion/         # Ingestion logic (Act, SAR, Standards)
+│   │   ├── act_ingest.py
+│   │   ├── sar_ingest.py
+│   │   └── standard_ingest.py
+│   ├── rag/               # Advanced RAG logic
+│   │   ├── query_processor.py # NEW: Decomposition logic
+│   │   ├── legal_mode.py      # V7 Flow
+│   │   └── finding_mode.py
+│   ├── retrieval/         # Retrieval backend
+│   │   ├── hybrid_search.py   # Base hybrid FTS + Vector
+│   │   └── advanced_retrieval.py # NEW: Multi-query & Authority Rank
+│   ├── utils/             # LLM & Embedding utilities
+│   │   ├── embedding.py
+│   │   ├── llm_client.py
+│   │   └── reranker.py
+│   └── main.py            # API entry point
+├── act_data/              # Factories Act Dataset
+├── sar_data/              # Audit Reports Dataset
+├── standards_data/        # Technical Standards (IS) Dataset
+├── frontend/              # Web Interface
+├── tests/                 # Evaluation suite
+├── init_db.py             # Schema setup
+├── baseline_results.json  # Phase 0 Baseline data
+└── requirements.txt
 ```
 
 ---
 
-## 🛠️ Setup Instructions
+## 🛠️ Setup Instructions (Ubuntu)
 
 ### 1. Prerequisites
+- Ubuntu 20.04+ / 22.04+
 - Python 3.10+
-- PostgreSQL with `pgvector` extension installed.
+- PostgreSQL 14+ with `pgvector` extension
 
-### 2. Environment Setup
-Clone the repository and create a virtual environment:
-```powershell
-python -m venv venv
-.\venv\Scripts\activate
+#### Install PostgreSQL & pgvector
+```bash
+sudo apt update
+sudo apt install -y postgresql postgresql-contrib libpq-dev
+# Install pgvector from source
+sudo apt install -y postgresql-server-dev-all build-essential git
+git clone https://github.com/pgvector/pgvector.git /tmp/pgvector
+cd /tmp/pgvector && make && sudo make install
+```
+
+#### Enable pgvector in PostgreSQL
+```bash
+sudo -u postgres psql -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+---
+
+### 2. Python Environment Setup
+```bash
+# Create and activate a virtual environment (or use conda)
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Database Configuration
-1. Create a `.env` file based on `.env.example`.
-2. Initialize the database schema:
-```powershell
+---
+
+### 3. Environment Configuration
+```bash
+# Copy template and fill in your credentials
+cp .env.example .env
+nano .env   # or: vim .env
+```
+
+Key variables to set in `.env`:
+| Variable | Description |
+|---|---|
+| `DB_NAME` | PostgreSQL database name |
+| `DB_USER` | PostgreSQL username |
+| `DB_PASSWORD` | PostgreSQL password |
+| `DB_HOST` | Database host (default: `localhost`) |
+| `DB_PORT` | Database port (default: `5432`) |
+| `XAI_API_KEY` | xAI Grok API key |
+| `LLM_MODEL` | LLM model name (e.g. `grok-4-fast-reasoning`) |
+| `EMBEDDING_MODEL` | HuggingFace embedding model |
+| `API_BASE_URL` | Full xAI chat completions endpoint URL |
+
+---
+
+### 4. Database Initialization
+```bash
 python init_db.py
 ```
 
-### 4. Data Ingestion
-Ingest the datasets into the vector database:
-```powershell
+---
+
+### 5. Data Ingestion
+```bash
 # Ingest Legal Acts
 python app/ingestion/act_ingest.py
 
@@ -63,25 +119,40 @@ python app/ingestion/act_ingest.py
 python app/ingestion/sar_ingest.py
 ```
 
-### 5. Verification (Optional)
-Run the test suite to evaluate system performance:
-```powershell
-python tests/compliance_eval.py
-```
-
 ---
 
-## 🏃 Running the Application
-To start the backend and automatically launch the UI:
-```powershell
+### 6. Run the Application
+```bash
 python app/main.py
 ```
-The UI will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+The API and UI will be available at: **http://127.0.0.1:8000**
+
+To run with auto-reload (development):
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
 
 ---
 
-## 🧪 Testing
-The system includes a specialized evaluation script for compliance accuracy:
-```powershell
+## 🧪 Testing & Evaluation
+```bash
 python tests/compliance_eval.py
 ```
+
+---
+
+## 🐧 Ubuntu & Hardware Notes
+- **CPU-Only Execution**: Forced to CPU in `app/utils/embedding.py` to leverage the 16GB RAM and avoid VRAM overflow on GPUs (especially 2GB versions).
+- Use `python3` instead of `python` if your system doesn't alias it.
+- Ensure your conda/venv is activated before running any commands.
+- PostgreSQL service management:
+  ```bash
+  sudo systemctl start postgresql
+  sudo systemctl enable postgresql
+  sudo systemctl status postgresql
+  ```
+- If port 8000 is already in use:
+  ```bash
+  lsof -i :8000          # find the process
+  kill -9 <PID>          # kill it
+  ```

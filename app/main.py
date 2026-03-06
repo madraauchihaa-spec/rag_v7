@@ -12,11 +12,12 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from rag.finding_mode import finding_mode
 from rag.legal_mode import legal_mode
+from utils.intent_classifier import classify_intent
 
 app = FastAPI(
     title="Compliance RAG Engine",
-    version="1.0.0",
-    description="AI-powered Compliance Intelligence System"
+    version="7.0.0",
+    description="AI-powered Compliance Intelligence System V7"
 )
 
 app.add_middleware(
@@ -61,28 +62,7 @@ def serve_frontend():
     )
 
 
-# ----------------------------
-# ROUTING LOGIC
-# ----------------------------
-
-LEGAL_KEYWORDS = [
-    "what", "when", "how", "penalty", "as per", "section", "rule",
-    "mandatory", "under", "license", "renewal", "requirement",
-    "provision", "safety", "health", "welfare", "obligation"
-]
-
-FINDING_KEYWORDS = [
-    "found", "observed", "broken", "blocked", "missing", "not available",
-    "violation", "incident", "accident", "damage", "leak", "spill", "no "
-]
-
-def is_legal_query(query: str):
-    q = query.lower()
-    # If it contains finding-like words, it's probably an audit finding
-    if any(word in q for word in FINDING_KEYWORDS):
-        return False
-    # If it's short or has legal keywords, it's a legal query
-    return any(word in q for word in LEGAL_KEYWORDS) or len(q.split()) < 4
+# Router logic moved to classify_intent utility
 
 
 @app.post("/rag/finding")
@@ -118,18 +98,21 @@ def rag_legal(request: LegalRequest):
 @app.post("/query")
 def unified_query(request: QueryRequest):
     try:
-        if is_legal_query(request.query):
-            result = legal_mode(
-                query=request.query,
-                site_profile=request.site_profile.dict()
-            )
-            result["mode_used"] = "Legal Query Mode"
-        else:
+        intent = classify_intent(request.query)
+        
+        if intent == "AUDIT_FINDING":
             result = finding_mode(
                 issue=request.query,
                 site_profile=request.site_profile.dict()
             )
             result["mode_used"] = "Finding Analysis Mode"
+        else:
+            # TECHNICAL_STANDARD queries also go to legal_mode for now, as it handles Standard retrieval
+            result = legal_mode(
+                query=request.query,
+                site_profile=request.site_profile.dict()
+            )
+            result["mode_used"] = "Legal Query Mode"
 
         return result
 
@@ -143,14 +126,25 @@ if __name__ == "__main__":
     import uvicorn
     import webbrowser
     from threading import Timer
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    
+    PORT = int(os.getenv("APP_PORT", 8001))
+    SERVER_URL = f"http://127.0.0.1:{PORT}"
 
     def open_browser():
-        webbrowser.open("http://127.0.0.1:8000")
+        # Only try to open browser if a display is available (Ubuntu desktop/GUI)
+        if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+            webbrowser.open(SERVER_URL)
+        else:
+            print("\nNo display detected (headless Ubuntu). Open the UI manually at:", SERVER_URL)
 
     print("\nStarting Compliance RAG Engine...")
-    print("UI will be available at: http://127.0.0.1:8000")
-    
+    print(f"UI will be available at: {SERVER_URL}")
+
     # Wait 1.5 seconds for the server to start before opening browser
     Timer(1.5, open_browser).start()
-    
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
+
+    uvicorn.run("main:app", host="127.0.0.1", port=PORT, reload=False)
+

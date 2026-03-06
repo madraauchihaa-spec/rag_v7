@@ -50,3 +50,13 @@ app/db/*.sqlite
 
 # Project Specific
 .agent/
+*.env
+
+# Data Isolation (Highly recommended to ignore large/sensitive datasets)
+# act_data/
+# sar_data/
+# standards_data/
+
+# OS Specific
+.DS_Store
+Thumbs.db

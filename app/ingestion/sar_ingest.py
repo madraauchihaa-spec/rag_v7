@@ -4,6 +4,7 @@ import sys
 import json
 import psycopg2
 import re
+from tqdm import tqdm
 from dotenv import load_dotenv
 
 # Add the 'app' directory to the Python path
@@ -114,9 +115,17 @@ def ingest_sar(file_path: str, reset: bool = False):
     print(f"Extracted {len(records)} findings. Indexing...")
 
     inserted = 0
-    for record in records:
+    for record in tqdm(records, desc=f"Ingesting {report_id}"):
         observation = record["observation"]
         recommendation = record["recommendation"]
+
+        # DUPLICATE CHECK
+        cursor.execute(
+            "SELECT 1 FROM sar_index WHERE report_id = %s AND observation = %s",
+            (record["report_id"], observation)
+        )
+        if cursor.fetchone():
+            continue
 
         # Determine topic
         topic = get_topic_for_text(f"{observation} {recommendation}")
@@ -140,7 +149,8 @@ def ingest_sar(file_path: str, reset: bool = False):
         )
         inserted += 1
 
-    print(f"✅ SAR ingestion completed for {report_id}. Inserted: {inserted}")
+    print(f"✅ Sync complete for {report_id}. New findings inserted: {inserted}")
+
     cursor.close()
     conn.close()
 
@@ -155,8 +165,6 @@ if __name__ == "__main__":
     json_files = [f for f in os.listdir(SAR_DIR) if f.lower().endswith(".json")]
     json_files.sort()
 
-    is_first = True
     for fn in json_files:
         fp = os.path.join(SAR_DIR, fn)
-        ingest_sar(file_path=fp, reset=is_first)
-        is_first = False
+        ingest_sar(file_path=fp, reset=False)
