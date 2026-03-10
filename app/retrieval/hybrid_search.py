@@ -3,6 +3,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
+from psycopg2.pool import SimpleConnectionPool
 
 from pgvector.psycopg2 import register_vector
 
@@ -11,31 +12,19 @@ from utils.reranker import mmr
 
 load_dotenv()
 
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+from utils.db import get_pool, get_db_connection, release_db_connection
 
+load_dotenv()
+
+# Global variables for connection management are now in utils.db
 ALLOWED_TABLES = {"sar_index", "act_index", "standard_index"}
+
 
 SOURCE_WEIGHTS = {
     "act_index": 1.0,
     "standard_index": 0.85,
     "sar_index": 0.6
 }
-
-
-def get_db_connection():
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT,
-    )
-    register_vector(conn)
-    return conn
 
 
 def _is_valid_filter_value(v):
@@ -140,7 +129,7 @@ def hybrid_search(
                     clean_rows.append(d)
                 return clean_rows
         finally:
-            conn.close()
+            release_db_connection(conn)
 
     # ---- Stage 1: filtered search ----
     results = run_query(use_filters=bool(filter_conditions))

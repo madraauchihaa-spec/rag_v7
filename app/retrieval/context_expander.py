@@ -1,4 +1,5 @@
 # app/retrieval/context_expander.py
+from collections import defaultdict
 from psycopg2.extras import RealDictCursor
 
 def expand_standard_context(results, conn):
@@ -52,4 +53,31 @@ def expand_standard_context(results, conn):
                 expanded.append(d)
 
     return expanded
+
+
+def aggregate_standard_sections(results):
+    """
+    Aggregates individual clauses into section-level blocks for the LLM prompt.
+    """
+    grouped = defaultdict(list)
+    for r in results:
+        key = (
+            r.get("standard_code"),
+            r.get("year"),
+            r.get("section_number")
+        )
+        grouped[key].append(r)
+
+    aggregated = []
+    for key, clauses in grouped.items():
+        first = clauses[0]
+        aggregated.append({
+            "standard_code": first.get("standard_code"),
+            "year": first.get("year"),
+            "section_number": first.get("section_number"),
+            "section_title": first.get("parent_clause_title"),
+            "clauses": [c.get("clause_number") for c in clauses],
+            "content": "\n".join(c.get("content", "") for c in clauses)
+        })
+    return aggregated
 

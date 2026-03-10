@@ -13,14 +13,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embedding import get_embedding
 from utils.ontology import get_topic_for_text
 
+from utils.db import get_raw_connection
+
 load_dotenv()
-
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
-
 
 def ingest_act(file_path: str, applicable_to: str = "All", reset: bool = False):
     """
@@ -30,15 +25,10 @@ def ingest_act(file_path: str, applicable_to: str = "All", reset: bool = False):
         print(f"Error: File not found at {file_path}")
         return
 
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT,
-    )
+    conn = get_raw_connection()
     conn.autocommit = True
     cursor = conn.cursor()
+
 
     if reset:
         print("Clearing existing Act data...")
@@ -127,7 +117,7 @@ Title: {sec['title']}
 {content}
 """.strip()
 
-        embedding = get_embedding(search_markdown)
+        embedding = get_embedding(search_markdown, is_query=False)
 
         cursor.execute(
             """

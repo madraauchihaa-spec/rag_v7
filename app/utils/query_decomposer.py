@@ -23,6 +23,39 @@ LEGAL_EXPANSIONS = {
         "fire protection systems",
         "fire extinguishers",
         "fire detection equipment"
+    ],
+    "chemical": [
+        "hazardous chemicals",
+        "msds requirements",
+        "secondary containment",
+        "spill control"
+    ],
+    "ppe": [
+        "protective equipment",
+        "safety gear",
+        "mandatory ppe"
+    ],
+    "structural": [
+        "structural stability",
+        "load bearing",
+        "safe access",
+        "gangways"
+    ],
+    "hygiene": [
+        "ventilation",
+        "cleanliness",
+        "drinking water",
+        "latrines"
+    ],
+    "health": [
+        "occupational health",
+        "medical examination",
+        "first aid facilities"
+    ],
+    "welfare": [
+        "canteen facilities",
+        "rest rooms",
+        "washing facilities"
     ]
 }
 

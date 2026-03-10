@@ -1,39 +1,16 @@
-# app/rag/legal_mode.py
 import re
 from retrieval.hybrid_search import search_standard, get_db_connection
-from retrieval.context_expander import expand_standard_context
+from retrieval.context_expander import expand_standard_context, aggregate_standard_sections
 from retrieval.advanced_retrieval import multi_query_hybrid_search, authority_rank
 from utils.query_decomposer import decompose_query
-from utils.llm_client import generate_response
+from utils.llm_client import generate_response, LLMError
 from utils.ontology import get_topic_for_text
 from utils.governance import filter_general_sections
 from utils.logger import log_rag_flow
 from utils.citation_validator import validate_citations
 from utils.text_cleaner import truncate_text
 
-def aggregate_standard_sections(results):
-    from collections import defaultdict
-    grouped = defaultdict(list)
-    for r in results:
-        key = (
-            r.get("standard_code"),
-            r.get("year"),
-            r.get("section_number")
-        )
-        grouped[key].append(r)
 
-    aggregated = []
-    for key, clauses in grouped.items():
-        first = clauses[0]
-        aggregated.append({
-            "standard_code": first.get("standard_code"),
-            "year": first.get("year"),
-            "section_number": first.get("section_number"),
-            "section_title": first.get("parent_clause_title"),
-            "clauses": [c.get("clause_number") for c in clauses],
-            "content": "\n".join(c.get("content", "") for c in clauses)
-        })
-    return aggregated
 
 
 
@@ -75,28 +52,34 @@ ONLY cite a provision if it is an 80-90% MATCH to the requirement. If the data i
 STEP 4: STRUCTURED RESPONSE
 You MUST follow this exact format:
 
-### 📝 Summary
-[Provide a user-friendly, helpful message first. Explain your understanding of the query and how it fits into the compliance landscape.]
+### 📝 Executive Summary
+[Provide a clear, high-level overview of the query and its compliance landscape. Use **bold text** for emphasis.]
 
 ---
 
-### ⚖️ Legal Applicability
-[Identify specific Section/Rule from the Factories Act. If no 80-90% match found, state "Not Applicable".]
+### 🔍 Fact-Check Table
+| Source Category | Status | Provision Reference |
+| :--- | :--- | :--- |
+| **Legal (Factories Act)** | [Applicable/N.A.] | [Section No.] |
+| **Tech Standards** | [Applicable/N.A.] | [IS Code:Year] |
 
-### 📜 Technical Standard Applicability
-[Identify specific IS Standard/Clause. If no 80-90% match found, state "Not Applicable".]
+---
 
-### 🔍 Compliance Gap
-[Analyze if the current query implies a mismatch with the law or standards. Describe 'potential' gap based on best practices. Be specific to user context.]
+### ⚖️ Legal & Regulatory Applicability
+* **Factories Act Requirement**: [Cite specific Section details]
+* **Technical Standard**: [Cite specific IS Standard/Clause]
 
-### 🚨 Risk Exposure
-[Detail legal, operational, and safety risks if these clauses are violated.]
+### 🔍 Compliance Gap & Risk
+* **Potential Gap**: [Analyze if a mismatch exists with **bold** highlights]
+* **Severity/Risk**: [Detail legal, operational, and safety risks]
 
-### ✅ Recommended Action
-[Provide step-by-step practical advice to achieve full compliance. Ensure accuracy to user's requirement.]
+### ✅ Recommended Action Plan
+1. **Compliance Strategy**: [Step-by-step advice]
+2. **Best Practices**: [Practical industry-standard tips]
 
-### 📂 Evidence Required
-[List specific documents, logs, or certificates required to prove compliance during an audit.]
+### 📂 Evidence of Compliance
+* [ ] [Required document 1]
+* [ ] [Required document 2]
 
 ---
 
@@ -169,7 +152,8 @@ def legal_mode(query: str, site_profile: dict):
             std_results = expand_standard_context(std_results, conn)
             log_rag_flow("Expanded Std Context", [{"clause": r.get("clause_number")} for r in std_results])
         finally:
-            conn.close()
+            from retrieval.hybrid_search import release_db_connection
+            release_db_connection(conn)
             
     std_results = aggregate_standard_sections(std_results)
     log_rag_flow("Aggregated Std Sections", [{"section": r.get("section_number"), "clauses": r.get("clauses")} for r in std_results])
@@ -182,13 +166,14 @@ def legal_mode(query: str, site_profile: dict):
             "draft_response": "### 🧐 Scope Validation\nI am designed specifically for **Compliance & Safety Intelligence**. I couldn't find any directly governing provisions in the Factories Act or technical Standards for this specific query."
         }
 
-    prompt = build_legal_prompt(query, site_profile, act_results, std_results)
-    response = generate_response(prompt)
+    try:
+        prompt = build_legal_prompt(query, site_profile, act_results, std_results)
+        response = generate_response(prompt)
 
-    law_context = "\n\n".join([f"Factories Act Section {r.get('section_number')}:\n{r.get('content')}" for r in act_results])
-    std_context = "\n\n".join([f"{r.get('standard_code')}:{r.get('year')} Clause {r.get('clause_number')}:\n{r.get('content')}" for r in std_results])
+        law_context = "\n\n".join([f"Factories Act Section {r.get('section_number')}:\n{r.get('content')}" for r in act_results])
+        std_context = "\n\n".join([f"{r.get('standard_code')}:{r.get('year')} Clause {r.get('clause_number')}:\n{r.get('content')}" for r in std_results])
 
-    verification_prompt = f"""
+        verification_prompt = f"""
 You are a Senior Compliance Auditor. Your task is to verify the DRAFT RESPONSE against the SOURCE LAW and STANDARDS for extreme factual accuracy.
 
 SOURCE LAW:
@@ -201,15 +186,23 @@ DRAFT RESPONSE:
 {response}
 
 INSTRUCTIONS:
-1) Ensure 'Legal & Standard Applicability' is rephrased for humans but stays 100% true to the sources.
-2) Use the format: "IS XXX:YYYY, Clause X.Y.Z" for standards.
-3) DO NOT REMOVE the headers or 'Query Analysis'.
-4) Ensure the tone is professional yet helpful.
+1) Use **Bold Headings** for key terms and identifiers.
+2) Use **Structured Bullet Points** (not just blocks of text).
+3) Ensure 'Fact-Check Table' is accurately filled.
+4) Maintain a professional, premium tone.
+5) USE MARKDOWN: Utilize bolding, lists, and tables to make the response "jump off the page".
 
 Return the final, polished, and verified response.
 """
-    verified_response = generate_response(verification_prompt)
-    verified_response = re.sub(r"Draft\s*–\s*For Professional Review", "", verified_response, flags=re.IGNORECASE).strip()
+        verified_response = generate_response(verification_prompt)
+        verified_response = re.sub(r"Draft\s*–\s*For Professional Review", "", verified_response, flags=re.IGNORECASE).strip()
+    except LLMError as e:
+        return {
+            "detected_topic": topic,
+            "legal_matches": act_results,
+            "standard_matches": std_results,
+            "draft_response": f"### ⚠️ AI Service Error\nI encountered an error while analyzing the compliance query: {str(e)}"
+        }
 
     # PHASE 2: Citation Validation Guard
     invalid_citations = validate_citations(
@@ -219,6 +212,7 @@ Return the final, polished, and verified response.
     )
     if invalid_citations:
         log_rag_flow("Invalid citations detected", invalid_citations)
+        verified_response += f"\n\n> [!WARNING]\n> **Citation Audit**: Some cited provisions ({', '.join(invalid_citations)}) were not found in the retrieved context. Please verify manually."
 
     raw_acts_display = "\n\n".join([
         f"### Section {r.get('section_number')}: {r.get('section_title')}\n\n{r.get('content')}"

@@ -13,23 +13,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.embedding import get_embedding
 from utils.ontology import get_topic_for_text
 
+from utils.db import get_raw_connection
+
 load_dotenv()
 
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
-
-
 def get_connection():
-    return psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT,
-    )
+    return get_raw_connection()
+
 
 
 def format_search_text(record: dict, topic: str) -> str:
@@ -130,7 +120,7 @@ def ingest_sar(file_path: str, reset: bool = False):
         # Determine topic
         topic = get_topic_for_text(f"{observation} {recommendation}")
         search_text = format_search_text(record, topic)
-        embedding = get_embedding(search_text)
+        embedding = get_embedding(search_text, is_query=False)
 
         cursor.execute(
             """

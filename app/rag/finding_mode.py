@@ -1,36 +1,18 @@
 import re
+import os
 from collections import defaultdict
-from retrieval.hybrid_search import search_sar, search_act, search_standard, get_db_connection
-from retrieval.context_expander import expand_standard_context
-from utils.llm_client import generate_response
+from retrieval.hybrid_search import search_sar, get_db_connection
+from retrieval.context_expander import expand_standard_context, aggregate_standard_sections
+from retrieval.advanced_retrieval import multi_query_hybrid_search, authority_rank
+from utils.query_decomposer import decompose_query
+from utils.llm_client import generate_response, LLMError
 from utils.ontology import get_topic_for_text
 from utils.governance import filter_general_sections
 from utils.logger import log_rag_flow
 from utils.citation_validator import validate_citations
 from utils.text_cleaner import truncate_text
 
-def aggregate_standard_sections(results):
-    grouped = defaultdict(list)
-    for r in results:
-        key = (
-            r.get("standard_code"),
-            r.get("year"),
-            r.get("section_number")
-        )
-        grouped[key].append(r)
 
-    aggregated = []
-    for key, clauses in grouped.items():
-        first = clauses[0]
-        aggregated.append({
-            "standard_code": first.get("standard_code"),
-            "year": first.get("year"),
-            "section_number": first.get("section_number"),
-            "section_title": first.get("parent_clause_title"),
-            "clauses": [c.get("clause_number") for c in clauses],
-            "content": "\n".join(c.get("content", "") for c in clauses)
-        })
-    return aggregated
 
 
 def build_prompt(issue, site_profile, sar_results, act_results, std_results):
@@ -75,28 +57,35 @@ ONLY cite a provision if it is an 80-90% MATCH to the requirement. If the data i
 STEP 4: STRUCTURED RESPONSE
 You MUST follow this exact format:
 
-### 📝 Summary
-[Provide a user-friendly, helpful message first. Explain your understanding of the query and how it fits into the compliance landscape.]
+### 📝 Executive Summary
+[Provide a clear, high-level overview of the issue and its significance. Use **bold text** for emphasis.]
 
 ---
 
-### ⚖️ Legal Applicability
-[Identify specific Section/Rule from the Factories Act. If no 80-90% match found, state "Not Applicable".]
+### 🔍 Fact-Check Table
+| Source Category | Status | Provision Reference |
+| :--- | :--- | :--- |
+| **Legal (Factories Act)** | [Applicable/N.A.] | [Section No.] |
+| **Tech Standards** | [Applicable/N.A.] | [IS Code:Year] |
 
-### 📜 Technical Standard Applicability
-[Identify specific IS Standard/Clause. If no 80-90% match found, state "Not Applicable".]
+---
 
-### 🔍 Compliance Gap
-[Detail exactly where the user's issue fails to meet the legal or standard criteria. Be specific to the user's requirement.]
+### 🔴 Observation & Gap Analysis
+* **Current State**: [Describe the problem found]
+* **Legal Requirement**: [Cite specific law/standard details]
+* **Compliance Gap**: [Highlight the exact mismatch with **bold** highlights]
 
-### 🚨 Risk Exposure
-[Identify specific safety hazards, environmental risks, and potential legal fines/prosecutions.]
+### 🚨 Risk & Business Impact
+* **Safety Risk**: [Specific hazard]
+* **Legal Exposure**: [Potential penalties or fines]
 
-### ✅ Recommended Action
-[Provide a clear, actionable solution. Use 'EXPERIENCE CASES' and 'STANDARDS DATA' for practical and technical solutions. Ensure it's accurate to the user's need.]
+### ✅ Actionable Recommendations
+1. **Immediate Step**: [Prioritized action]
+2. **Systemic Change**: [Long-term fix based on best practices]
 
-### 📂 Evidence Required
-[List specific proofs needed: e.g., Inspection Certificates, Maintenance Logs, Training Records.]
+### 📂 Proof of Compliance (Audit Evidence)
+* [ ] [Evidence item 1 - e.g. Inspection Logs]
+* [ ] [Evidence item 2 - e.g. Training Records]
 
 ---
 
@@ -134,7 +123,11 @@ def finding_mode(issue: str, site_profile: dict):
     topic = get_topic_for_text(issue)
     log_rag_flow("Detected Topic", topic)
 
-    # Retrieval
+    # Phase 1: Query Decomposition
+    decomposed_queries = decompose_query(issue)
+    log_rag_flow("Expanded Queries", decomposed_queries)
+
+    # Phase 2: Retrieval
     sar_results = search_sar(
         issue,
         industry_type=site_profile.get("industry_type"),
@@ -143,9 +136,19 @@ def finding_mode(issue: str, site_profile: dict):
     )
     log_rag_flow("Retrieved SAR Matches", [{"id": r.get("id"), "score": r.get("score")} for r in sar_results])
 
-
-    act_results = search_act(issue, compliance_topic=topic)
-    std_results = search_standard(issue, compliance_topic=topic)
+    act_results = multi_query_hybrid_search(
+        table_name="act_index",
+        sub_queries=decomposed_queries,
+        compliance_topic=topic,
+        top_k=5
+    )
+    
+    std_results = multi_query_hybrid_search(
+        table_name="standard_index",
+        sub_queries=decomposed_queries,
+        compliance_topic=topic,
+        top_k=7
+    )
     
     log_rag_flow("Initial Act Retrieval", [{"id": r.get("id"), "section": r.get("section_number")} for r in (act_results or [])])
     log_rag_flow("Initial Std Retrieval", [{"id": r.get("id"), "clause": r.get("clause_number")} for r in (std_results or [])])
@@ -157,13 +160,16 @@ def finding_mode(issue: str, site_profile: dict):
             std_results = expand_standard_context(std_results, conn)
             log_rag_flow("Expanded Std Context", [{"clause": r.get("clause_number")} for r in std_results])
         finally:
-            conn.close()
+            from retrieval.hybrid_search import release_db_connection
+            release_db_connection(conn)
 
-    # Filtering
+    # Filtering & Ranking
     act_results = act_results[:3] if act_results else []
     act_results = filter_general_sections(act_results)
+    act_results = authority_rank(act_results)
     
     std_results = std_results[:5] if std_results else []
+    std_results = authority_rank(std_results)
     std_results = aggregate_standard_sections(std_results)
     log_rag_flow("Aggregated Std Sections", [{"section": r.get("section_number"), "clauses": r.get("clauses")} for r in std_results])
 
@@ -176,14 +182,15 @@ def finding_mode(issue: str, site_profile: dict):
             "draft_response": "### ⚠️ No Direct Legal or Standard Provision Found\nNo directly governing Factories Act section or Standard clause found in the retrieved database."
         }
 
-    prompt = build_prompt(issue, site_profile, sar_results, act_results, std_results)
-    response = generate_response(prompt)
+    try:
+        prompt = build_prompt(issue, site_profile, sar_results, act_results, std_results)
+        response = generate_response(prompt)
 
-    # Verification Pass
-    law_context = "\n\n".join([f"Factories Act - Section {r.get('section_number')}:\n{r.get('content')}" for r in act_results])
-    std_context = "\n\n".join([f"{r.get('standard_code')}:{r.get('year')} Section {r.get('section_number')}:\n{r.get('content')}" for r in std_results])
+        # Verification Pass
+        law_context = "\n\n".join([f"Factories Act - Section {r.get('section_number')}:\n{r.get('content')}" for r in act_results])
+        std_context = "\n\n".join([f"{r.get('standard_code')}:{r.get('year')} Section {r.get('section_number')}:\n{r.get('content')}" for r in std_results])
 
-    verification_prompt = f"""
+        verification_prompt = f"""
 You are a Senior Compliance Auditor. Your task is to verify the DRAFT RESPONSE against the SOURCE LAW, STANDARDS, and EXPERIENCE CASES.
 
 SOURCE LAW:
@@ -196,16 +203,24 @@ DRAFT RESPONSE:
 {response}
 
 INSTRUCTIONS:
-1) Ensure 'Legal & Standard Applicability' is rephrased for humans but stays 100% true to the law/standards.
-2) When citing standards, use the format: "IS XXX:YYYY, Clause X.Y.Z".
-3) Ensure 'Compliance Gap' clearly explains the violation.
-4) DO NOT REMOVE headers or 'Query Analysis'.
-5) Maintain professional tone.
+1) Use **Bold Headings** for key terms and identifiers.
+2) Use **Structured Bullet Points** (not just blocks of text).
+3) Ensure 'Fact-Check Table' is accurately filled.
+4) Keep the tone professional, authoritative, and helpful.
+5) USE MARKDOWN: Utilize bolding, lists, and tables to make the response "premium".
 
 Return the final, polished, and verified response.
 """
-    verified_response = generate_response(verification_prompt)
-    verified_response = re.sub(r"Draft\s*–\s*For Professional Review", "", verified_response, flags=re.IGNORECASE).strip()
+        verified_response = generate_response(verification_prompt)
+        verified_response = re.sub(r"Draft\s*–\s*For Professional Review", "", verified_response, flags=re.IGNORECASE).strip()
+    except LLMError as e:
+        return {
+            "detected_topic": topic,
+            "sar_matches": sar_results,
+            "legal_matches": act_results,
+            "standard_matches": std_results,
+            "draft_response": f"### ⚠️ AI Service Error\nI encountered an error while analyzing the compliance data: {str(e)}"
+        }
 
     # PHASE 2: Citation Validation Guard
     invalid_citations = validate_citations(
@@ -215,6 +230,7 @@ Return the final, polished, and verified response.
     )
     if invalid_citations:
         log_rag_flow("Invalid citations detected", invalid_citations)
+        verified_response += f"\n\n> [!WARNING]\n> **Citation Audit**: Some cited provisions ({', '.join(invalid_citations)}) were not found in the retrieved context. Please verify manually."
 
     raw_acts_display = "\n\n".join([
         f"### Section {r.get('section_number')}: {r.get('section_title')}\n\n{r.get('content')}"

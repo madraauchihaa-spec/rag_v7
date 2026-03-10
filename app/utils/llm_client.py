@@ -12,6 +12,11 @@ API_BASE_URL = os.getenv("API_BASE_URL")
 LLM_MODEL = os.getenv("LLM_MODEL")
 
 
+class LLMError(Exception):
+    """Custom exception for LLM API failures."""
+    pass
+
+
 def generate_response(prompt: str):
     # API_BASE_URL already contains the full endpoint URL
     url = API_BASE_URL
@@ -37,15 +42,18 @@ def generate_response(prompt: str):
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         else:
-            print(f"LLM API Error: {response.status_code} - {response.text}")
-            return f"[ERROR] The AI could not generate a response (Status {response.status_code})."
+            error_msg = f"LLM API Error: {response.status_code} - {response.text}"
+            print(error_msg)
+            raise LLMError(error_msg)
 
     except requests.exceptions.Timeout:
-        print("LLM Connection Error: Request timed out after 60s.")
-        return "[ERROR] The AI service timed out. Please try again."
+        error_msg = "LLM Connection Error: Request timed out after 60s."
+        print(error_msg)
+        raise LLMError(error_msg)
 
     except Exception as e:
-        print(f"LLM Connection Error: {e}")
+        error_msg = f"LLM Connection Error: {e}"
+        print(error_msg)
         import traceback
         traceback.print_exc()
-        return "[ERROR] Connection to the AI service failed."
+        raise LLMError(error_msg)
