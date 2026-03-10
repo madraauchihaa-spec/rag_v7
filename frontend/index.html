@@ -1,27 +1,28 @@
-# frontend/index.html
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Navi.AI</title>
+    <title>Navi.AI | Compliance Intelligence</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary: #4f46e5;
-            --primary-hover: #4338ca;
-            --bg: #f8fafc;
-            --card-bg: #6366f1;
-            --form-bg: #ffffff;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --accent: #059669;
-            --white: #ffffff;
+            --primary-light: #e0e7ff;
+            --secondary: #ec4899;
+            --bg-page: #f9fafb;
+            --bg-card: #ffffff;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --accent: #10b981;
+            --glass: rgba(255, 255, 255, 0.8);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
         }
 
         * {
@@ -32,244 +33,345 @@
         }
 
         body {
-            background-color: var(--bg);
+            background-color: var(--bg-page);
             color: var(--text-main);
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
+            background: radial-gradient(circle at top right, #f5f3ff, #f9fafb);
         }
 
+        /* --- Header --- */
         header {
-            padding: 1.25rem 2rem;
+            padding: 1rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--white);
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 1000;
         }
 
-        .logo {
-            font-size: 1.5rem;
+        .header-logo {
+            font-size: 1.25rem;
             font-weight: 600;
-            letter-spacing: -0.025em;
             color: var(--primary);
+            letter-spacing: -0.02em;
         }
 
-        main {
-            flex: 1;
-            padding: 2.5rem 2rem;
-            max-width: 900px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        .hero {
-            text-align: center;
-            margin-bottom: 2.5rem;
-        }
-
-        .hero h1 {
-            font-size: 2.25rem;
-            font-weight: 600;
-            color: var(--text-main);
-            margin-bottom: 0.75rem;
-        }
-
-        .hero p {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-        }
-
-        .query-card {
-            background: var(--form-bg);
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 2rem;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            margin-bottom: 2.5rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        textarea {
-            width: 100%;
-            padding: 1rem;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            color: var(--text-main);
-            font-size: 1rem;
-            resize: vertical;
-            min-height: 120px;
-            outline: none;
-            transition: all 0.2s;
-        }
-
-        textarea:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-            background: var(--white);
-        }
-
-        .profile-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-        }
-
-        select,
-        input[type="text"] {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            color: var(--text-main);
-            outline: none;
-            transition: all 0.2s;
-        }
-
-        select:focus,
-        input[type="text"]:focus {
-            border-color: var(--primary);
-            background: var(--white);
-        }
-
-        button {
-            width: 100%;
-            padding: 1rem;
-            background: var(--primary);
-            color: var(--white);
-            border: none;
-            border-radius: 0.75rem;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 1rem;
-        }
-
-        button:hover {
-            background: var(--primary-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        #results {
-            margin-top: 1rem;
-            display: none;
-        }
-
-        .result-card {
-            background: var(--white);
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 2.5rem;
-            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05);
-            animation: slideUp 0.4s ease-out;
-        }
-
-        .result-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 2rem;
-            color: var(--text-main);
-            border-bottom: 2px solid var(--bg);
-            padding-bottom: 1rem;
-        }
-
-        .section-container {
-            margin-bottom: 2rem;
-        }
-
-        .section-label {
-            display: inline-block;
-            color: var(--primary);
-            font-weight: 600;
+        /* .system-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 0.75rem;
-            padding: 0.25rem 0.75rem;
-            background: rgba(79, 70, 229, 0.08);
-            border-radius: 4px;
-        }
+            font-weight: 500;
+            color: var(--accent);
+        } */
 
-        .markdown-body {
-            font-size: 1rem;
-            line-height: 1.7;
-            color: var(--text-main);
-        }
-
-        .markdown-body p {
-            margin-bottom: 1rem;
-        }
-
-        .markdown-body ul,
-        .markdown-body ol {
-            margin-bottom: 1rem;
-            padding-left: 1.5rem;
-        }
-
-        .markdown-body li {
-            margin-bottom: 0.5rem;
-        }
-
-        .markdown-body h1,
-        .markdown-body h2,
-        .markdown-body h3 {
-            margin: 1.5rem 0 1rem;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        .markdown-body code {
-            background: var(--bg);
-            padding: 0.2rem 0.4rem;
-            border-radius: 4px;
-            font-size: 0.9em;
-            color: var(--primary);
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            margin: 3rem 0;
-        }
-
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid var(--border);
-            border-left-color: var(--primary);
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1.25rem;
+            box-shadow: 0 0 8px var(--accent);
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
+        /* --- Transitions --- */
+        .fade-out {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .fade-in {
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        /* --- Welcome Screen (Centered) --- */
+        #welcome-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            z-index: 10;
+        }
+
+        .hero-logo {
+            font-size: 3.5rem;
+            font-weight: 600;
+            background: linear-gradient(to right, #4f46e5, #9333ea, #db2777);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            animation: breathe 4s infinite ease-in-out;
+            letter-spacing: -0.05em;
+        }
+
+        @keyframes breathe {
+
+            0%,
+            100% {
+                transform: scale(1);
+                filter: drop-shadow(0 0 10px rgba(79, 70, 229, 0.1));
+            }
+
+            50% {
+                transform: scale(1.05);
+                filter: drop-shadow(0 0 25px rgba(147, 51, 234, 0.2));
             }
         }
 
+        .hero-subtitle {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            margin-bottom: 3rem;
+            text-align: center;
+            max-width: 600px;
+            font-weight: 400;
+        }
+
+        /* --- Chat Interface --- */
+        #chat-container {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            width: 100%;
+            max-width: 850px;
+            margin: 0 auto;
+            position: relative;
+            padding-bottom: 120px;
+            height: calc(100vh - 70px);
+            overflow: hidden;
+        }
+
+        #chat-history {
+            flex: 1;
+            padding: 2.5rem 1rem;
+            overflow-y: auto;
+            /* Enable vertical scroll */
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        #chat-history::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #chat-history::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+
+        .message {
+            margin-bottom: 2.5rem;
+            animation: slideUp 0.3s ease-out;
+            max-width: 100%;
+        }
+
+        .message.user {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .message.user .content {
+            background: #f3f4f6;
+            padding: 0.8rem 1.25rem;
+            border-radius: 1.25rem;
+            color: var(--text-main);
+            font-weight: 500;
+            max-width: 80%;
+            border: 1px solid var(--border);
+        }
+
+        .message.assistant {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .message.assistant .content {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 2rem;
+            border-radius: 1rem;
+            line-height: 1.75;
+            box-shadow: var(--shadow);
+            color: var(--text-main);
+        }
+
+        .message.assistant .content h3 {
+            margin: 1.75rem 0 0.85rem;
+            color: var(--primary);
+            font-size: 1.15rem;
+            font-weight: 600;
+            border-left: 3px solid var(--primary);
+            padding-left: 10px;
+        }
+
+        .message.assistant .content h3:first-child {
+            margin-top: 0;
+        }
+
+        .message.assistant .content hr {
+            border: 0;
+            border-top: 1px solid var(--border);
+            margin: 2rem 0;
+        }
+
+        /* --- Query Bar --- */
+        #query-wrapper {
+            width: 100%;
+            max-width: 750px;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+
+        /* State: Initial (Centered) */
+        #query-wrapper.centered {
+            margin-top: 0;
+        }
+
+        /* State: Bottom (Fixed) */
+        #query-wrapper.bottom {
+            position: fixed;
+            bottom: 2.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 800px;
+            padding: 0 1rem;
+            z-index: 100;
+        }
+
+        .input-box {
+            background: var(--bg-card);
+            border: 1.5px solid var(--border);
+            border-radius: 1.25rem;
+            padding: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .input-box:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .input-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.1rem;
+            padding: 0.6rem 0.75rem;
+            resize: none;
+            outline: none;
+            max-height: 200px;
+            min-height: 44px;
+        }
+
+        .input-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            margin-top: 0.5rem;
+        }
+
+        .profile-badges {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            background: #f3f4f6;
+            border: 1px solid var(--border);
+            padding: 0.35rem 0.85rem;
+            border-radius: 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .badge:hover {
+            background: #e5e7eb;
+            color: var(--text-main);
+        }
+
+        .send-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .send-btn:hover {
+            background: #3730a3;
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            background: var(--border);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .stop-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: none;
+            /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .stop-btn:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+
+        .square-icon {
+            width: 14px;
+            height: 14px;
+            background: white;
+            border-radius: 2px;
+        }
+
+        /* --- Animations --- */
         @keyframes slideUp {
             from {
                 opacity: 0;
@@ -282,215 +384,352 @@
             }
         }
 
-        .error {
-            color: #b91c1c;
-            background: #fef2f2;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            border: 1px solid #fee2e2;
-            margin-top: 1.25rem;
+        /* --- Loading States --- */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 1rem 0;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.4;
+                transform: scale(0.8);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+
+        /* --- Site Profile Modal --- */
+        #profile-modal {
             display: none;
-            font-size: 0.9rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            outline: none;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .modal-actions button {
+            flex: 1;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .cancel-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .save-btn {
+            background: var(--primary);
+            border: none;
+            color: white;
         }
     </style>
 </head>
 
 <body>
     <header>
-        <div class="logo">Navi.AI</div>
-        <div class="status-badge"
-            style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--accent); font-weight: 600;">
-            <div style="width: 8px; height: 8px; background: var(--accent); border-radius: 50%;"></div>
-            System Active
-        </div>
+        <div class="header-logo">Navi.AI</div>
+        <!-- <div class="system-status">
+            <div class="status-dot"></div>
+            V7 Optimized Enterprise RAG
+        </div> -->
     </header>
 
-    <main>
-        <div class="hero">
-            <h1>Compliance Intelligence</h1>
-            <p>Smart legal lookup and audit analysis for safety professionals.</p>
-        </div>
+    <!-- Welcome Screen -->
+    <div id="welcome-screen">
+        <div class="hero-logo">Navi.AI</div>
+        <p class="hero-subtitle">The enterprise compliance engine for deep legal research and audit verification.
+            Powered by NaviSafe.</p>
 
-        <div class="query-card">
+        <div id="query-wrapper" class="centered">
+            <div class="input-box">
+                <div class="input-top">
+                    <textarea id="query-input" placeholder="How can I help you today?"
+                        oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                </div>
+                <div class="input-actions">
+                    <div class="profile-badges">
+                        <div class="badge" onclick="openProfileModal()">Site Profile: <span
+                                id="profile-summary">Null</span></div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button id="stopBtn" class="stop-btn">
+                            <div class="square-icon"></div>
+                        </button>
+                        <button id="sendBtn" class="send-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="19" x2="12" y2="5"></line>
+                                <polyline points="5 12 12 5 19 12"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div id="chat-container">
+        <div id="chat-history">
+            <!-- Messages will be injected here -->
+        </div>
+    </div>
+
+    <!-- Site Profile Modal -->
+    <div id="profile-modal">
+        <div class="modal-content">
+            <div class="modal-title">Site Configuration</div>
             <div class="form-group">
-                <label for="query">Query or Audit Finding</label>
-                <textarea id="query" placeholder="Describe the compliance issue or ask a legal question..."></textarea>
+                <label>Industry Type</label>
+                <input type="text" id="industry-input" placeholder="e.g. Engineering" value="Null">
             </div>
-
-            <div class="profile-grid">
-                <div class="form-group">
-                    <label for="industry">Industry</label>
-                    <input type="text" id="industry" placeholder="e.g., Engineering" value="None">
-                </div>
-                <div class="form-group">
-                    <label for="mah">MAH Status</label>
-                    <select id="mah">
-                        <option value="Null">None (N/A)</option>
-                        <option value="Non_MAH">Non-MAH</option>
-                        <option value="MAH">MAH</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="state">State</label>
-                    <input type="text" id="state" placeholder="e.g., Gujarat" value="None">
-                </div>
+            <div class="form-group">
+                <label>MAH Status</label>
+                <select id="mah-input">
+                    <option value="Null">None (N/A)</option>
+                    <option value="Non_MAH">Non-MAH</option>
+                    <option value="MAH">MAH</option>
+                </select>
             </div>
-
-            <button id="submitBtn">Analyze Compliance</button>
-            <div id="errorMessage" class="error"></div>
+            <div class="form-group">
+                <label>State</label>
+                <input type="text" id="state-input" value="None" , placeholder="e.g. Gujarat">
+            </div>
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeProfileModal()">Cancel</button>
+                <button class="save-btn" onclick="saveProfile()">Save Profile</button>
+            </div>
         </div>
-
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p style="color: var(--text-muted); font-weight: 500;">Navi.AI is analyzing legal frameworks...</p>
-        </div>
-
-        <div id="results">
-            <!-- Results will be injected here -->
-        </div>
-    </main>
+    </div>
 
     <script>
-        const submitBtn = document.getElementById('submitBtn');
-        const queryInput = document.getElementById('query');
-        const industryInput = document.getElementById('industry');
-        const mahInput = document.getElementById('mah');
-        const stateInput = document.getElementById('state');
-        const resultsDiv = document.getElementById('results');
-        const loadingDiv = document.getElementById('loading');
-        const errorDiv = document.getElementById('errorMessage');
+        const queryInput = document.getElementById('query-input');
+        const sendBtn = document.getElementById('sendBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const chatContainer = document.getElementById('chat-container');
+        const chatHistory = document.getElementById('chat-history');
+        const queryWrapper = document.getElementById('query-wrapper');
+        const profileSummary = document.getElementById('profile-summary');
 
-        submitBtn.addEventListener('click', async () => {
+        let isFirstQuery = true;
+        let generationActive = false;
+        let shouldStop = false;
+
+        // --- Site Profile Logic ---
+        function openProfileModal() { document.getElementById('profile-modal').style.display = 'flex'; }
+        function closeProfileModal() { document.getElementById('profile-modal').style.display = 'none'; }
+        function saveProfile() {
+            const industry = document.getElementById('industry-input').value;
+            profileSummary.innerText = industry;
+            closeProfileModal();
+        }
+
+        // --- Core Interaction ---
+        sendBtn.addEventListener('click', () => handleQuery());
+        queryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleQuery();
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            shouldStop = true;
+            stopBtn.style.display = 'none';
+            sendBtn.style.display = 'flex';
+        });
+
+        async function handleQuery() {
             const query = queryInput.value.trim();
-            if (!query) return;
+            if (!query || generationActive) return;
 
-            resultsDiv.style.display = 'none';
-            resultsDiv.innerHTML = '';
-            errorDiv.style.display = 'none';
-            loadingDiv.style.display = 'block';
+            if (isFirstQuery) {
+                transitionUI();
+                isFirstQuery = false;
+            }
 
-            // Lock inputs and button
-            queryInput.disabled = true;
-            industryInput.disabled = true;
-            mahInput.disabled = true;
-            stateInput.disabled = true;
-            submitBtn.disabled = true;
-            submitBtn.innerText = 'Analyzing...';
+            // Add user message
+            addMessage('user', query);
+            queryInput.value = '';
+            queryInput.style.height = '44px';
 
-            const payload = {
-                query: query,
-                site_profile: {
-                    industry_type: industryInput.value || "Null",
-                    mah_status: mahInput.value || "Null",
-                    state: stateInput.value || "Null"
-                }
-            };
+            // Loading state
+            generationActive = true;
+            shouldStop = false;
+            sendBtn.style.display = 'none';
+            stopBtn.style.display = 'flex';
+
+            const typingMsg = addMessage('assistant', '<div class="typing-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>', true);
 
             try {
+                const payload = {
+                    query: query,
+                    site_profile: {
+                        industry_type: document.getElementById('industry-input').value || "None",
+                        mah_status: document.getElementById('mah-input').value || "None",
+                        state: document.getElementById('state-input').value || "None"
+                    }
+                };
+
                 const response = await fetch('/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                if (!response.ok) throw new Error("API Connection Failed");
 
-                const data = await response.json();
-                renderResults(data);
+                const result = await dataProcessing(await response.json());
+
+                // Start "Interpretation" (Simulated line-by-line reveal)
+                await interpretAnswer(typingMsg, result.draft_response);
+
             } catch (err) {
-                errorDiv.textContent = `Correction: ${err.message}. Check backend connection.`;
-                errorDiv.style.display = 'block';
+                typingMsg.innerHTML = `<span style="color: #ef4444;">Error: ${err.message}</span>`;
             } finally {
-                loadingDiv.style.display = 'none';
-
-                // Unfreeze inputs and reset button
-                queryInput.disabled = false;
-                industryInput.disabled = false;
-                mahInput.disabled = false;
-                stateInput.disabled = false;
-                submitBtn.disabled = false;
-                submitBtn.innerText = 'Analyze Compliance';
+                generationActive = false;
+                sendBtn.style.display = 'flex';
+                stopBtn.style.display = 'none';
             }
-
-        });
-
-        function renderResults(data) {
-            let container = document.createElement('div');
-            container.className = 'result-card';
-
-            let title = document.createElement('div');
-            title.className = 'result-title';
-            title.innerText = 'Compliance Analysis';
-            container.appendChild(title);
-
-            // 1. Directly render the main AI Response (markdown) without any label
-            if (data.draft_response) {
-                const mainResponseEl = document.createElement('div');
-                mainResponseEl.className = 'markdown-body';
-                mainResponseEl.style.marginBottom = '2rem';
-                mainResponseEl.innerHTML = marked.parse(data.draft_response);
-                container.appendChild(mainResponseEl);
-            }
-
-            // 2. Predefined order for other specific standalone fields if they exist
-            const sectionMap = [
-                { key: 'answer', label: 'Summary' },
-                { key: 'legal_grounding', label: 'Legal Grounding' },
-                { key: 'Compliance Gap', label: 'Compliance Gap' },
-                { key: 'Risk Exposure', label: 'Risk Exposure' },
-                { key: 'Recommended Action', label: 'Recommended Action' },
-                { key: 'Evidence Required', label: 'Evidence Required' }
-            ];
-
-            sectionMap.forEach(sec => {
-                if (data[sec.key] && sec.key !== 'draft_response') {
-                    appendSection(container, sec.label, data[sec.key]);
-                }
-            });
-
-            // 3. Catch any other metadata (Excluding raw acts and internals)
-            const internalKeys = [
-                'mode_used',
-                'detected_topic',
-                'legal_matches',
-                'sar_matches',
-                'draft_response',
-                'Legal Applicability' // Explicitly remove raw acts from demo view
-            ];
-
-            Object.keys(data).forEach(key => {
-                const isInternal = internalKeys.includes(key);
-                const isAlreadyShown = sectionMap.some(s => s.key === key);
-
-                if (!isInternal && !isAlreadyShown && typeof data[key] === 'string') {
-                    appendSection(container, key.replace(/_/g, ' '), data[key]);
-                }
-            });
-
-
-
-            resultsDiv.innerHTML = '';
-            resultsDiv.appendChild(container);
-            resultsDiv.style.display = 'block';
-            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        function appendSection(parent, label, content) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'section-container';
+        function transitionUI() {
+            // Remove hero title and subtitle
+            document.querySelector('.hero-logo').classList.add('fade-out');
+            document.querySelector('.hero-subtitle').classList.add('fade-out');
 
-            const labelEl = document.createElement('div');
-            labelEl.className = 'section-label';
-            labelEl.innerText = label;
+            setTimeout(() => {
+                welcomeScreen.style.display = 'none'; // Hide completely to free space
+                chatContainer.style.display = 'flex';
+                queryWrapper.classList.remove('centered');
+                queryWrapper.classList.add('bottom');
 
-            const contentEl = document.createElement('div');
-            contentEl.className = 'markdown-body';
-            // Render markdown using marked.js
-            contentEl.innerHTML = marked.parse(content);
+                // Move query wrapper to body so it stays visible after welcome-screen is hidden
+                document.body.appendChild(queryWrapper);
+            }, 500);
+        }
 
-            wrapper.appendChild(labelEl);
-            wrapper.appendChild(contentEl);
-            parent.appendChild(wrapper);
+        function addMessage(role, text, isRaw = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content markdown-body';
+
+            if (isRaw) {
+                contentDiv.innerHTML = text;
+            } else {
+                contentDiv.innerHTML = marked.parse(text);
+            }
+
+            msgDiv.appendChild(contentDiv);
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            return contentDiv;
+        }
+
+        async function interpretAnswer(element, fullText) {
+            element.innerHTML = '';
+            const lines = fullText.split('\n');
+            let currentText = '';
+
+            for (let line of lines) {
+                if (shouldStop) break;
+
+                currentText += line + '\n';
+                element.innerHTML = marked.parse(currentText);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+
+                // Line delay
+                await new Promise(resolve => setTimeout(resolve, 80));
+
+                // Check stop inside line reveal if it's too long
+                if (line.length > 50) {
+                    await new Promise(resolve => setTimeout(resolve, 150));
+                }
+            }
+        }
+
+        async function dataProcessing(data) {
+            // Pre-process response if needed (similar to previous logic)
+            return data;
         }
     </script>
 </body>

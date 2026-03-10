@@ -116,8 +116,17 @@ def hybrid_search(
                 
                 for r in rows:
                     d = dict(r)
+                    content_lower = d.get("content", "").lower()
+                    
+                    # Authority multiplier
+                    auth_multiplier = SOURCE_WEIGHTS.get(table_name, 1.0)
                     d["score"] = d["score"] * auth_multiplier
                     
+                    # Legal keyword boosts
+                    if "shall" in content_lower:
+                        d["score"] += 0.05
+                    if "must" in content_lower:
+                        d["score"] += 0.05
                     for k, v in d.items():
                         # Convert UUIDs and other non-JSON types to strings
                         if hasattr(v, '__class__') and v.__class__.__name__ == 'UUID':

@@ -4,6 +4,8 @@ from retrieval.hybrid_search import search_standard, get_db_connection
 from retrieval.context_expander import expand_standard_context
 from retrieval.advanced_retrieval import multi_query_hybrid_search, authority_rank
 from utils.query_decomposer import decompose_query
+from utils.query_understanding import build_query_set, normalize_query
+from utils.context_budget import limit_context
 from utils.llm_client import generate_response
 from utils.ontology import get_topic_for_text
 from utils.governance import filter_general_sections
@@ -23,8 +25,14 @@ def aggregate_standard_sections(results):
         grouped[key].append(r)
 
     aggregated = []
-    for key, clauses in grouped.items():
+    MAX_CLAUSES_PER_SECTION = 3
+    
+    for section_id, clauses in grouped.items():
         first = clauses[0]
+        
+        # Phase 1: Clause Budget Controller
+        clauses = clauses[:MAX_CLAUSES_PER_SECTION]
+        
         aggregated.append({
             "standard_code": first.get("standard_code"),
             "year": first.get("year"),
@@ -54,37 +62,28 @@ def build_legal_prompt(query, site_profile, act_results, std_results):
         ]
     )
     
-    act_text = truncate_text(act_text, 1500)
-    std_text = truncate_text(std_text, 1500)
+    act_text = truncate_text(act_text, 1000)
+    std_text = truncate_text(std_text, 1200)
 
     prompt = f"""
 SYSTEM ROLE: You are Navi.AI, a highly specialized Compliance Intelligent Assistant for Safety and Legal Professionals.
 
-STEP 1: QUERY COMPREHENSION
-First, deep-dive into the user's query. Understand the technical and regulatory context.
-
-STEP 2: CITATION RULES
+STEP 1: CITATION RULES
 1) Only cite provisions present in LEGAL DATA or STANDARDS DATA.
 2) Do not create new sections or clauses.
-3) If no provision applies, write "Not Applicable".
 
-STEP 3: RETRIEVAL ANALYSIS
+STEP 2: RETRIEVAL ANALYSIS
 Compare the query against the provided LEGAL DATA and STANDARDS DATA.
-ONLY cite a provision if it is an 80-90% MATCH to the requirement. If the data is only tangentially related or too general, you MUST state "Not Applicable" for that section.
+ONLY cite a provision if it is an 80-90% MATCH to the requirement. If the data is only tangentially related or too general, DO NOT include that section in the response.
 
-STEP 4: STRUCTURED RESPONSE
-You MUST follow this exact format:
-
-### 📝 Summary
-[Provide a user-friendly, helpful message first. Explain your understanding of the query and how it fits into the compliance landscape.]
-
----
+STEP 3: STRUCTURED RESPONSE
+You MUST follow this exact format. If a section is not applicable, OMIT it entirely. DO NOT show headers for empty sections.
 
 ### ⚖️ Legal Applicability
-[Identify specific Section/Rule from the Factories Act. If no 80-90% match found, state "Not Applicable".]
+[Identify specific Section/Rule from the Factories Act. OMIT this entire block if no 80-90% match is found.]
 
 ### 📜 Technical Standard Applicability
-[Identify specific IS Standard/Clause. If no 80-90% match found, state "Not Applicable".]
+[Identify specific IS Standard/Clause. OMIT this entire block if no 80-90% match is found.]
 
 ### 🔍 Compliance Gap
 [Analyze if the current query implies a mismatch with the law or standards. Describe 'potential' gap based on best practices. Be specific to user context.]
@@ -100,15 +99,20 @@ You MUST follow this exact format:
 
 ---
 
+### 📝 Summary
+[Provide a user-friendly, helpful message at the very end. Explain your understanding of the query and the compliance outcome.]
+
+---
+
 USER QUERY: {query}
 INDUSTRY: {site_profile.get('industry_type', 'General')}
 MAH STATUS: {site_profile.get('mah_status', 'N/A')}
 
 LEGAL DATA (Factories Act):
-{act_text}
+{act_text if act_text else "No directly relevant law found in database."}
 
 STANDARDS DATA:
-{std_text}
+{std_text if std_text else "No directly relevant standard clause found in database."}
 """
     return prompt
 
@@ -125,10 +129,18 @@ def legal_mode(query: str, site_profile: dict):
             "draft_response": "Hello! I am **Navi.AI**, your Compliance Intelligent Assistant. I can help you with legal lookups, technical standards, and safety audit analysis. How can I assist you today?"
         }
 
-    # PHASE 1: Query Decomposition
+    # PHASE 1: Query Understanding & Decomposition
     log_rag_flow("Query received", query)
     
-    decomposed_queries = decompose_query(query)
+    normalized = normalize_query(query)
+    log_rag_flow("Normalized Query", normalized)
+
+    base_queries = build_query_set(query)
+    decomposed_queries = []
+    for q in base_queries:
+        decomposed_queries.extend(decompose_query(q))
+    
+    decomposed_queries = list(set(decomposed_queries))
     log_rag_flow("Expanded Queries", decomposed_queries)
     
     # PHASE 2: Topic Detection
@@ -154,7 +166,6 @@ def legal_mode(query: str, site_profile: dict):
 
     # PHASE 4: Filtering & Ranking
     act_results = act_results[:3] if act_results else []
-    act_results = filter_general_sections(act_results)
     act_results = authority_rank(act_results)
     log_rag_flow("Filtered Act Results", [{"id": r.get("id"), "section": r.get("section_number")} for r in act_results])
     
@@ -171,7 +182,13 @@ def legal_mode(query: str, site_profile: dict):
         finally:
             conn.close()
             
+    # Phase 3: Context Token Budget Manager
+    act_results = limit_context(act_results, 2)
+    act_results = filter_general_sections(act_results)
+    
+    std_results = limit_context(std_results, 3)
     std_results = aggregate_standard_sections(std_results)
+    
     log_rag_flow("Aggregated Std Sections", [{"section": r.get("section_number"), "clauses": r.get("clauses")} for r in std_results])
 
     if not act_results and not std_results:
@@ -179,7 +196,7 @@ def legal_mode(query: str, site_profile: dict):
             "detected_topic": topic,
             "legal_matches": [],
             "standard_matches": [],
-            "draft_response": "### 🧐 Scope Validation\nI am designed specifically for **Compliance & Safety Intelligence**. I couldn't find any directly governing provisions in the Factories Act or technical Standards for this specific query."
+            "draft_response": "### 🧐 Scope Validation\nI couldn't find any directly governing provisions in the Factories Act or technical Standards for this specific query.\n\n---\n\n### 📝 Summary\nI am designed specifically for **Compliance & Safety Intelligence**. The current query falls outside the retrieved legal and technical coverage."
         }
 
     prompt = build_legal_prompt(query, site_profile, act_results, std_results)
@@ -201,14 +218,22 @@ DRAFT RESPONSE:
 {response}
 
 INSTRUCTIONS:
-1) Ensure 'Legal & Standard Applicability' is rephrased for humans but stays 100% true to the sources.
-2) Use the format: "IS XXX:YYYY, Clause X.Y.Z" for standards.
-3) DO NOT REMOVE the headers or 'Query Analysis'.
-4) Ensure the tone is professional yet helpful.
+1) Ensure 'Legal & Standard Applicability' sections are rephrased for humans but stay 100% true to the sources.
+2) If a section (Legal or Standard) in the DRAFT is "Not Applicable" or empty, REMOVE it entirely from the final output.
+3) Move the '### 📝 Summary' to the very end if it isn't already there.
+4) DO NOT include 'Query Analysis' or any internal thinking in the output.
+5) Ensure the tone is professional yet helpful.
 
 Return the final, polished, and verified response.
 """
-    verified_response = generate_response(verification_prompt)
+
+    # Phase 4: Smart Verification Trigger
+    has_citations = re.search(r"Section\s\d+|Clause\s\d", response)
+    
+    if has_citations:
+        verified_response = generate_response(verification_prompt)
+    else:
+        verified_response = response
     verified_response = re.sub(r"Draft\s*–\s*For Professional Review", "", verified_response, flags=re.IGNORECASE).strip()
 
     # PHASE 2: Citation Validation Guard

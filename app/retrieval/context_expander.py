@@ -27,18 +27,32 @@ def expand_standard_context(results, conn):
 
             seen_sections.add(section_key)
 
-            cursor.execute("""
-                SELECT *
-                FROM standard_index
-                WHERE standard_code = %s
-                AND year = %s
-                AND section_number = %s
-                ORDER BY clause_number ASC
-            """, (
-                r["standard_code"],
-                r["year"],
-                r["section_number"]
-            ))
+            # Hierarchical sibling expansion
+            clause_num = r.get("clause_number", "")
+            if clause_num and "." in clause_num:
+                # e.g. 7.1.1 -> 7.1.%
+                parent_prefix = ".".join(clause_num.split(".")[:-1]) + ".%"
+                cursor.execute("""
+                    SELECT * FROM standard_index
+                    WHERE standard_code = %s AND year = %s
+                    AND (section_number = %s OR clause_number LIKE %s)
+                    ORDER BY clause_number ASC
+                    LIMIT 4
+                """, (r["standard_code"], r["year"], r["section_number"], parent_prefix))
+            else:
+                cursor.execute("""
+                    SELECT *
+                    FROM standard_index
+                    WHERE standard_code = %s
+                    AND year = %s
+                    AND section_number = %s
+                    ORDER BY clause_number ASC
+                    LIMIT 4
+                """, (
+                    r["standard_code"],
+                    r["year"],
+                    r["section_number"]
+                ))
 
             rows = cursor.fetchall()
 

@@ -1,4 +1,4 @@
-
+# app/utils/query_decomposer.py
 LEGAL_EXPANSIONS = {
     "safety": [
         "safety equipment",

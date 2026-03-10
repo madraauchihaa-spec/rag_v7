@@ -1,3 +1,4 @@
+# app/utils/intent_classifier.py
 INTENTS = {
     "LEGAL_QUERY": [
         "section",

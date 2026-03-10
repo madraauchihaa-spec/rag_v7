@@ -17,3 +17,4 @@ sentence-transformers>=2.7.0
 numpy>=2.0.0
 torch>=2.1.0  # Runs on CPU by default
 tqdm>=4.66.0
+rapidfuzz>=3.8.1
