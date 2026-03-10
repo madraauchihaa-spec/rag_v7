@@ -4,7 +4,7 @@ from psycopg2.extras import RealDictCursor
 from utils.reranker import mmr
 from utils.embedding import get_embedding
 
-def multi_query_hybrid_search(table_name, sub_queries, compliance_topic=None, top_k=5, metadata_filter=None):
+def multi_query_hybrid_search(table_name, sub_queries, compliance_topic=None, top_k=5):
     """
     Executes multiple searches and merges results using reciprocal rank fusion or top-score selection.
     """
@@ -17,9 +17,8 @@ def multi_query_hybrid_search(table_name, sub_queries, compliance_topic=None, to
         results = hybrid_search(
             table_name=table_name,
             query_text=q,
-            top_k=15,
+            top_k=7,
             compliance_topic=compliance_topic,
-            metadata_filter=metadata_filter,
             diversity_lambda=None # Disable internal MMR to do it once at the end
         )
         for r in results:
